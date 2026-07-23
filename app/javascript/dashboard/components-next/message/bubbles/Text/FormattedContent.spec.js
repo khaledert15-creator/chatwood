@@ -28,8 +28,11 @@ describe('FormattedContent', () => {
     const message = wrapper.get('span');
 
     expect(message.attributes('dir')).toBe('rtl');
-    expect(message.classes()).toContain('leading-relaxed');
-    expect(message.classes()).toContain('[&_p]:my-1');
+    expect(message.classes()).toContain('text-right');
+    expect(message.classes()).toContain('leading-normal');
+    expect(message.classes()).toContain('[&_p]:my-0');
+    expect(message.classes()).toContain('sm:leading-relaxed');
+    expect(message.classes()).toContain('sm:[&_p]:my-1');
   });
 
   it('keeps English content styling unchanged', () => {
@@ -37,7 +40,9 @@ describe('FormattedContent', () => {
     const message = wrapper.get('span');
 
     expect(message.attributes('dir')).toBeUndefined();
-    expect(message.classes()).not.toContain('leading-relaxed');
-    expect(message.classes()).not.toContain('[&_p]:my-1');
+    expect(message.classes()).not.toContain('leading-normal');
+    expect(message.classes()).not.toContain('[&_p]:my-0');
+    expect(message.classes()).not.toContain('sm:leading-relaxed');
+    expect(message.classes()).not.toContain('sm:[&_p]:my-1');
   });
 });

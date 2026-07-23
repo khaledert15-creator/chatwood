@@ -30,7 +30,7 @@ const formattedContent = computed(() => {
     v-dompurify-html="formattedContent"
     class="prose prose-bubble"
     :class="{
-      'text-right leading-relaxed [&_li]:my-0.5 [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0':
+      'text-right leading-normal [&_li]:my-0 [&_p]:my-0 sm:leading-relaxed sm:[&_li]:my-0.5 sm:[&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0':
         hasArabicContent,
     }"
     :dir="hasArabicContent ? 'rtl' : undefined"
