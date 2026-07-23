@@ -82,6 +82,7 @@ class ConversationFinder
 
     find_all_conversations
     filter_by_status unless params[:q]
+    filter_by_response_state
     filter_by_team
     filter_by_labels
     filter_by_query
@@ -163,6 +164,36 @@ class ConversationFinder
     return if params[:status] == 'all'
 
     @conversations = @conversations.where(status: params[:status] || DEFAULT_STATUS)
+  end
+
+  def filter_by_response_state
+    case params[:response_state]
+    when 'unread'
+      filter_by_unread_response_state
+    when 'new'
+      @conversations = @conversations.where(first_reply_created_at: nil)
+    end
+  end
+
+  def filter_by_unread_response_state
+    messages = Message.arel_table
+    conversations = Conversation.arel_table
+    current_user_last_seen_at = Arel::Nodes::Case.new
+                                                 .when(conversations[:assignee_id].eq(current_user.id))
+                                                 .then(conversations[:assignee_last_seen_at])
+                                                 .else(conversations[:agent_last_seen_at])
+    unread_message = messages
+                     .project(Arel.sql('1'))
+                     .where(messages[:conversation_id].eq(conversations[:id]))
+                     .where(messages[:account_id].eq(current_account.id))
+                     .where(messages[:message_type].eq(Message.message_types[:incoming]))
+                     .where(messages[:private].eq(false))
+                     .where(
+                       current_user_last_seen_at.eq(nil)
+                         .or(messages[:created_at].gt(current_user_last_seen_at))
+                     )
+
+    @conversations = @conversations.where(unread_message.exists)
   end
 
   def filter_by_team

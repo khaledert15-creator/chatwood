@@ -9,10 +9,18 @@ import wootConstants from 'dashboard/constants/globals';
 import SelectMenu from 'dashboard/components-next/selectmenu/SelectMenu.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-defineProps({
+const props = defineProps({
   isOnExpandedLayout: {
     type: Boolean,
     required: true,
+  },
+  activeStatus: {
+    type: String,
+    required: true,
+  },
+  activeResponseState: {
+    type: String,
+    default: '',
   },
 });
 
@@ -38,26 +46,30 @@ const currentSortBy = computed(() => {
   );
 });
 
-const chatStatusOptions = computed(() => [
+const responseStateOptions = computed(() => [
   {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
-    value: 'open',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.resolved.TEXT'),
-    value: 'resolved',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
-    value: 'pending',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
-    value: 'snoozed',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.all.TEXT'),
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT'),
     value: 'all',
+    status: 'all',
+    responseState: '',
+  },
+  {
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.unread.TEXT'),
+    value: 'unread',
+    status: 'all',
+    responseState: 'unread',
+  },
+  {
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.new.TEXT'),
+    value: 'new',
+    status: 'open',
+    responseState: 'new',
+  },
+  {
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.resolved.TEXT'),
+    value: 'resolved',
+    status: 'resolved',
+    responseState: '',
   },
 ]);
 
@@ -104,11 +116,27 @@ const chatSortOptions = computed(() => [
   },
 ]);
 
-const activeChatStatusLabel = computed(
-  () =>
-    chatStatusOptions.value.find(m => m.value === chatStatusFilter.value)
-      ?.label || ''
-);
+const activeResponseState = computed(() => {
+  if (props.activeResponseState) return props.activeResponseState;
+  if (props.activeStatus === 'resolved') return 'resolved';
+  if (props.activeStatus === 'all') return 'all';
+  return '';
+});
+
+const legacyStatusLabels = computed(() => ({
+  open: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
+  pending: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
+  snoozed: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
+}));
+
+const activeResponseStateLabel = computed(() => {
+  const selectedOption = responseStateOptions.value.find(
+    option => option.value === activeResponseState.value
+  );
+  if (selectedOption) return selectedOption.label;
+
+  return legacyStatusLabels.value[props.activeStatus] || '';
+});
 
 const activeChatSortLabel = computed(
   () =>
@@ -117,18 +145,31 @@ const activeChatSortLabel = computed(
 );
 
 const saveSelectedFilter = (type, value) => {
+  const selectedResponseState =
+    type === 'responseState'
+      ? responseStateOptions.value.find(option => option.value === value)
+      : null;
   updateUISettings({
     conversations_filter_by: {
-      status: type === 'status' ? value : currentStatusFilter.value,
+      status: selectedResponseState?.status || currentStatusFilter.value,
+      response_state:
+        selectedResponseState !== null
+          ? selectedResponseState.responseState
+          : props.activeResponseState,
       order_by: type === 'sort' ? value : currentSortBy.value,
     },
   });
 };
 
-const handleStatusChange = value => {
-  emit('changeFilter', value, 'status');
-  store.dispatch('setChatStatusFilter', value);
-  saveSelectedFilter('status', value);
+const handleResponseStateChange = value => {
+  const selectedOption = responseStateOptions.value.find(
+    option => option.value === value
+  );
+  if (!selectedOption) return;
+
+  emit('changeFilter', selectedOption, 'responseState');
+  store.dispatch('setChatStatusFilter', selectedOption.status);
+  saveSelectedFilter('responseState', value);
 };
 
 const handleSortChange = value => {
@@ -162,11 +203,11 @@ const handleSortChange = value => {
           {{ $t('CHAT_LIST.CHAT_SORT.STATUS') }}
         </span>
         <SelectMenu
-          :model-value="chatStatusFilter"
-          :options="chatStatusOptions"
-          :label="activeChatStatusLabel"
+          :model-value="activeResponseState"
+          :options="responseStateOptions"
+          :label="activeResponseStateLabel"
           :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
-          @update:model-value="handleStatusChange"
+          @update:model-value="handleResponseStateChange"
         />
       </div>
       <div class="flex items-center justify-between last:mt-4 gap-2">

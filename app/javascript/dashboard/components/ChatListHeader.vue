@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { formatNumber } from '@chatwoot/utils';
 import wootConstants from 'dashboard/constants/globals';
@@ -13,6 +14,7 @@ const props = defineProps({
   hasAppliedFilters: { type: Boolean, required: true },
   hasActiveFolders: { type: Boolean, required: true },
   activeStatus: { type: String, required: true },
+  activeResponseState: { type: String, default: '' },
   isOnExpandedLayout: { type: Boolean, required: true },
   conversationStats: { type: Object, required: true },
   isListLoading: { type: Boolean, required: true },
@@ -27,6 +29,7 @@ const emit = defineEmits([
 ]);
 
 const { uiSettings, updateUISettings } = useUISettings();
+const { t } = useI18n();
 
 const onBasicFilterChange = (value, type) => {
   emit('basicFilterChange', value, type);
@@ -38,6 +41,30 @@ const hasAppliedFiltersOrActiveFolders = computed(() => {
 
 const allCount = computed(() => props.conversationStats?.allCount || 0);
 const formattedAllCount = computed(() => formatNumber(allCount.value));
+
+const responseStateLabels = computed(() => ({
+  all: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT'),
+  unread: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.unread.TEXT'),
+  new: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.new.TEXT'),
+  resolved: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.resolved.TEXT'),
+}));
+
+const legacyStatusLabels = computed(() => ({
+  open: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
+  pending: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
+  snoozed: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
+}));
+
+const activeFilterLabel = computed(() => {
+  if (props.activeResponseState) {
+    return responseStateLabels.value[props.activeResponseState] || '';
+  }
+  if (['all', 'resolved'].includes(props.activeStatus)) {
+    return responseStateLabels.value[props.activeStatus] || '';
+  }
+
+  return legacyStatusLabels.value[props.activeStatus] || '';
+});
 
 const toggleConversationLayout = () => {
   const { LAYOUT_TYPES } = wootConstants;
@@ -82,7 +109,7 @@ const toggleConversationLayout = () => {
         v-if="!hasAppliedFiltersOrActiveFolders"
         class="px-2 py-1 my-0.5 mx-1 rounded-md capitalize bg-n-slate-3 text-xxs text-n-slate-12 shrink-0"
       >
-        {{ $t(`CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.${activeStatus}.TEXT`) }}
+        {{ activeFilterLabel }}
       </span>
     </div>
     <div class="flex items-center gap-1">
@@ -156,6 +183,8 @@ const toggleConversationLayout = () => {
       </div>
       <ConversationBasicFilter
         v-if="!hasAppliedFiltersOrActiveFolders"
+        :active-status="activeStatus"
+        :active-response-state="activeResponseState"
         :is-on-expanded-layout="isOnExpandedLayout"
         @change-filter="onBasicFilterChange"
       />

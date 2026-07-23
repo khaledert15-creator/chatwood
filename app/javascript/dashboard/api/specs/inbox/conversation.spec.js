@@ -46,6 +46,7 @@ describe('#ConversationAPI', () => {
         page: 1,
         labels: [],
         teamId: 1,
+        responseState: 'unread',
         updatedWithin: 20,
       });
       expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations', {
@@ -56,6 +57,7 @@ describe('#ConversationAPI', () => {
           assignee_type: 'me',
           page: 1,
           labels: [],
+          response_state: 'unread',
           updated_within: 20,
         },
       });
@@ -155,6 +157,7 @@ describe('#ConversationAPI', () => {
         assigneeType: 'me',
         labels: [],
         teamId: 1,
+        responseState: 'new',
       });
       expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations/meta', {
         params: {
@@ -163,6 +166,7 @@ describe('#ConversationAPI', () => {
           status: 'open',
           assignee_type: 'me',
           labels: [],
+          response_state: 'new',
         },
       });
     });

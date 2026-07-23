@@ -36,6 +36,20 @@
         "TEXT": "الكل"
       }
     },
+    "RESPONSE_STATE_FILTER_ITEMS": {
+      "all": {
+        "TEXT": "الكل"
+      },
+      "unread": {
+        "TEXT": "غير مقروءة"
+      },
+      "new": {
+        "TEXT": "جديدة"
+      },
+      "resolved": {
+        "TEXT": "مغلقة"
+      }
+    },
     "VIEW_FILTER": "عرض",
     "SORT_TOOLTIP_LABEL": "ترتيب المحادثات",
     "CHAT_SORT": {

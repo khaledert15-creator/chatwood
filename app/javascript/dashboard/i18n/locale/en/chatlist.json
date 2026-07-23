@@ -36,6 +36,20 @@
         "TEXT": "All"
       }
     },
+    "RESPONSE_STATE_FILTER_ITEMS": {
+      "all": {
+        "TEXT": "All"
+      },
+      "unread": {
+        "TEXT": "Unread"
+      },
+      "new": {
+        "TEXT": "New"
+      },
+      "resolved": {
+        "TEXT": "Closed"
+      }
+    },
     "VIEW_FILTER": "View",
     "SORT_TOOLTIP_LABEL": "Sort conversations",
     "CHAT_SORT": {

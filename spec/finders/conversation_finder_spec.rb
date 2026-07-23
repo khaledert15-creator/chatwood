@@ -157,6 +157,169 @@ describe ConversationFinder do
       end
     end
 
+    context 'with unread response state' do
+      let(:params) { { status: 'all', response_state: 'unread' } }
+
+      it 'returns only conversations with public incoming messages after agent last seen' do
+        unread_conversation = create(:conversation, account: account, inbox: inbox,
+                                                    agent_last_seen_at: 1.hour.ago)
+        read_conversation = create(:conversation, account: account, inbox: inbox,
+                                                  agent_last_seen_at: 1.minute.ago)
+        private_conversation = create(:conversation, account: account, inbox: inbox,
+                                                     agent_last_seen_at: 1.hour.ago)
+        outgoing_conversation = create(:conversation, account: account, inbox: inbox,
+                                                      agent_last_seen_at: 1.hour.ago)
+        unseen_conversation = create(:conversation, account: account, inbox: inbox,
+                                                    agent_last_seen_at: nil)
+        resolved_unread_conversation = create(:conversation, account: account, inbox: inbox,
+                                                             status: 'resolved', agent_last_seen_at: 1.hour.ago)
+
+        [unread_conversation, unseen_conversation, resolved_unread_conversation].each do |conversation|
+          create(:message, account: account, inbox: inbox, conversation: conversation,
+                           message_type: :incoming, private: false, created_at: 5.minutes.ago)
+        end
+        create(:message, account: account, inbox: inbox, conversation: read_conversation,
+                         message_type: :incoming, private: false, created_at: 5.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: private_conversation,
+                         message_type: :incoming, private: true, created_at: 5.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: outgoing_conversation,
+                         message_type: :outgoing, private: false, created_at: 5.minutes.ago)
+
+        conversation_ids = conversation_finder.perform[:conversations].map(&:id)
+
+        expect(conversation_ids).to include(
+          unread_conversation.id,
+          unseen_conversation.id,
+          resolved_unread_conversation.id
+        )
+        expect(conversation_ids).not_to include(
+          read_conversation.id,
+          private_conversation.id,
+          outgoing_conversation.id
+        )
+      end
+
+      it 'does not mix conversations from other inboxes or accounts' do
+        other_inbox = create(:inbox, account: account)
+        create(:inbox_member, user: user_1, inbox: other_inbox)
+        other_account = create(:account)
+        other_account_inbox = create(:inbox, account: other_account)
+
+        expected_conversation = create(:conversation, account: account, inbox: inbox,
+                                                      agent_last_seen_at: 1.hour.ago)
+        other_inbox_conversation = create(:conversation, account: account, inbox: other_inbox,
+                                                         agent_last_seen_at: 1.hour.ago)
+        other_account_conversation = create(:conversation, account: other_account, inbox: other_account_inbox,
+                                                           agent_last_seen_at: 1.hour.ago)
+
+        [
+          [expected_conversation, account, inbox],
+          [other_inbox_conversation, account, other_inbox],
+          [other_account_conversation, other_account, other_account_inbox]
+        ].each do |conversation, message_account, message_inbox|
+          create(:message, account: message_account, inbox: message_inbox, conversation: conversation,
+                           message_type: :incoming, private: false, created_at: 5.minutes.ago)
+        end
+
+        result = described_class.new(
+          user_1,
+          params.merge(inbox_id: inbox.id)
+        ).perform
+        conversation_ids = result[:conversations].map(&:id)
+
+        expect(conversation_ids).to include(expected_conversation.id)
+        expect(conversation_ids).not_to include(
+          other_inbox_conversation.id,
+          other_account_conversation.id
+        )
+      end
+
+      it 'uses assignee last seen for conversations assigned to the current user' do
+        assigned_unread_conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          assignee: user_1,
+          assignee_last_seen_at: 1.hour.ago
+        )
+        assigned_read_conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          assignee: user_1,
+          assignee_last_seen_at: 1.minute.ago
+        )
+
+        [assigned_unread_conversation, assigned_read_conversation].each do |conversation|
+          create(:message, account: account, inbox: inbox, conversation: conversation,
+                           message_type: :incoming, private: false, created_at: 5.minutes.ago)
+        end
+
+        conversation_ids = conversation_finder.perform[:conversations].map(&:id)
+
+        expect(conversation_ids).to include(assigned_unread_conversation.id)
+        expect(conversation_ids).not_to include(assigned_read_conversation.id)
+      end
+
+      it 'uses agent last seen when the conversation is assigned to another user' do
+        conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          assignee: user_2,
+          agent_last_seen_at: 1.hour.ago,
+          assignee_last_seen_at: 1.minute.ago
+        )
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, private: false, created_at: 5.minutes.ago)
+
+        expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
+      end
+    end
+
+    context 'with new response state' do
+      let(:params) { { status: 'open', response_state: 'new' } }
+
+      it 'returns conversations without a first reply and excludes replied conversations' do
+        new_conversation = create(:conversation, account: account, inbox: inbox, first_reply_created_at: nil)
+        replied_conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          first_reply_created_at: 5.minutes.ago
+        )
+        closed_new_conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          status: 'resolved',
+          first_reply_created_at: nil
+        )
+        pending_new_conversation = create(:conversation, account: account, inbox: inbox, status: 'pending',
+                                                         first_reply_created_at: nil)
+        snoozed_new_conversation = create(:conversation, account: account, inbox: inbox, status: 'snoozed',
+                                                         first_reply_created_at: nil)
+
+        conversation_ids = conversation_finder.perform[:conversations].map(&:id)
+
+        expect(conversation_ids).to include(new_conversation.id)
+        expect(conversation_ids).not_to include(
+          replied_conversation.id,
+          closed_new_conversation.id,
+          pending_new_conversation.id,
+          snoozed_new_conversation.id
+        )
+      end
+    end
+
+    context 'with an unknown response state' do
+      let(:params) { { status: 'all', response_state: 'unknown' } }
+
+      it 'ignores the value without changing the existing status behavior' do
+        expect(conversation_finder.perform[:conversations].length).to eq 5
+      end
+    end
+
     context 'with assignee_type assigned' do
       let(:params) { { assignee_type: 'assigned' } }
 

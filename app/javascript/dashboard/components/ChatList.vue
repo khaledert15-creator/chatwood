@@ -73,7 +73,8 @@ const store = useStore();
 const resolveAttributesModalRef = ref(null);
 
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
-const activeStatus = ref(wootConstants.STATUS_TYPE.OPEN);
+const activeStatus = ref(wootConstants.STATUS_TYPE.ALL);
+const activeResponseState = ref('');
 const activeSortBy = ref(wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC);
 const showAdvancedFilters = ref(false);
 // chatsOnView is to store the chats that are currently visible on the screen,
@@ -251,6 +252,7 @@ const conversationFilters = computed(() => {
     inboxId: props.conversationInbox ? props.conversationInbox : undefined,
     assigneeType: activeAssigneeTab.value,
     status: activeStatus.value,
+    responseState: activeResponseState.value || undefined,
     sortBy: activeSortBy.value,
     page: conversationListPagination.value,
     labels: props.label ? [props.label] : undefined,
@@ -380,8 +382,9 @@ const uniqueInboxes = computed(() => {
 // ---------------------- Methods -----------------------
 function setFiltersFromUISettings() {
   const { conversations_filter_by: filterBy = {} } = uiSettings.value;
-  const { status, order_by: orderBy } = filterBy;
-  activeStatus.value = status || wootConstants.STATUS_TYPE.OPEN;
+  const { status, response_state: responseState, order_by: orderBy } = filterBy;
+  activeStatus.value = status || wootConstants.STATUS_TYPE.ALL;
+  activeResponseState.value = responseState || '';
   activeSortBy.value = Object.values(wootConstants.SORT_BY_TYPE).includes(
     orderBy
   )
@@ -615,8 +618,9 @@ function updateAssigneeTab(selectedTab) {
 }
 
 function onBasicFilterChange(value, type) {
-  if (type === 'status') {
-    activeStatus.value = value;
+  if (type === 'responseState') {
+    activeStatus.value = value.status;
+    activeResponseState.value = value.responseState;
   } else {
     activeSortBy.value = value;
   }
@@ -896,6 +900,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :has-applied-filters="hasAppliedFilters"
       :has-active-folders="hasActiveFolders"
       :active-status="activeStatus"
+      :active-response-state="activeResponseState"
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"
       :is-list-loading="chatListLoading && !conversationList.length"
