@@ -14,7 +14,9 @@ const props = defineProps({
 
 const { variant } = useMessageContext();
 
-const hasArabicContent = computed(() => /\p{Script=Arabic}/u.test(props.content));
+const hasArabicContent = computed(() =>
+  /\p{Script=Arabic}/u.test(props.content)
+);
 
 const formattedContent = computed(() => {
   if (variant.value === MESSAGE_VARIANTS.ACTIVITY) {

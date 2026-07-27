@@ -3,22 +3,16 @@ class ConversationFinder
 
   DEFAULT_STATUS = 'open'.freeze
   SORT_OPTIONS = {
-    'last_activity_at_asc' => %w[sort_on_last_activity_at asc],
-    'last_activity_at_desc' => %w[sort_on_last_activity_at desc],
-    'created_at_asc' => %w[sort_on_created_at asc],
-    'created_at_desc' => %w[sort_on_created_at desc],
-    'priority_asc' => %w[sort_on_priority asc],
-    'priority_desc' => %w[sort_on_priority desc],
-    'waiting_since_asc' => %w[sort_on_waiting_since asc],
-    'waiting_since_desc' => %w[sort_on_waiting_since desc],
+    'last_activity_at_asc' => %w[sort_on_last_activity_at asc], 'last_activity_at_desc' => %w[sort_on_last_activity_at desc],
+    'created_at_asc' => %w[sort_on_created_at asc], 'created_at_desc' => %w[sort_on_created_at desc],
+    'priority_asc' => %w[sort_on_priority asc], 'priority_desc' => %w[sort_on_priority desc],
+    'waiting_since_asc' => %w[sort_on_waiting_since asc], 'waiting_since_desc' => %w[sort_on_waiting_since desc],
     'priority_desc_created_at_asc' => %w[sort_on_priority_created_at desc],
     'unread' => %w[sort_on_unread desc],
 
     # To be removed in v3.5.0
-    'latest' => %w[sort_on_last_activity_at desc],
-    'sort_on_created_at' => %w[sort_on_created_at asc],
-    'sort_on_priority' => %w[sort_on_priority desc],
-    'sort_on_waiting_since' => %w[sort_on_waiting_since asc]
+    'latest' => %w[sort_on_last_activity_at desc], 'sort_on_created_at' => %w[sort_on_created_at asc],
+    'sort_on_priority' => %w[sort_on_priority desc], 'sort_on_waiting_since' => %w[sort_on_waiting_since asc]
   }.with_indifferent_access
   # assumptions
   # inbox_id if not given, take from all conversations, else specific to inbox
@@ -161,14 +155,10 @@ class ConversationFinder
   end
 
   def filter_by_status
-    if params[:status] == 'active'
-      @conversations = @conversations.where(status: Conversations::ResponseStateFilter::ACTIVE_STATUSES)
-      return
-    end
-
     return if params[:status] == 'all'
 
-    @conversations = @conversations.where(status: params[:status] || DEFAULT_STATUS)
+    statuses = params[:status] == 'active' ? Conversations::ResponseStateFilter::ACTIVE_STATUSES : params[:status] || DEFAULT_STATUS
+    @conversations = @conversations.where(status: statuses)
   end
 
   def filter_by_response_state
@@ -205,20 +195,15 @@ class ConversationFinder
   def set_count_for_all_conversations
     return legacy_count_for_all_conversations if @conversations.limit_value || @conversations.offset_value || @conversations.eager_loading?
 
-    counts = @conversations.unscope(:order).pick(
+    @conversations.unscope(:order).pick(
       Arel.sql("COUNT(*) FILTER (WHERE assignee_id = #{current_user.id})"),
       Arel.sql('COUNT(*) FILTER (WHERE assignee_id IS NULL)'),
       Arel.sql('COUNT(*)')
-    )
-    counts || [0, 0, 0]
+    ) || [0, 0, 0]
   end
 
   def legacy_count_for_all_conversations
-    [
-      @conversations.assigned_to(current_user).count,
-      @conversations.unassigned.count,
-      @conversations.count
-    ]
+    [@conversations.assigned_to(current_user).count, @conversations.unassigned.count, @conversations.count]
   end
 
   def current_page

@@ -198,6 +198,7 @@ describe ConversationFinder do
                          message_type: :incoming, private: true, created_at: 5.minutes.ago)
         create(:message, account: account, inbox: inbox, conversation: outgoing_conversation,
                          message_type: :outgoing, private: false, created_at: 5.minutes.ago)
+        resolved_unread_conversation.update!(status: :resolved)
 
         conversation_ids = conversation_finder.perform[:conversations].map(&:id)
 
@@ -307,6 +308,7 @@ describe ConversationFinder do
         end
         create(:message, account: account, inbox: inbox, conversation: replied,
                          message_type: :outgoing, sender: user_1, created_at: 5.minutes.ago)
+        resolved.update!(status: :resolved)
 
         conversation_ids = conversation_finder.perform[:conversations].map(&:id)
 
@@ -336,6 +338,7 @@ describe ConversationFinder do
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :outgoing, sender: agent_bot,
                          content_attributes: { external_echo: true }, created_at: 3.minutes.ago)
+        conversation.update!(status: :open)
 
         expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
       end
