@@ -839,6 +839,44 @@ describe('#addMentions', () => {
       expect(localDispatch).not.toHaveBeenCalled();
     });
 
+    it('fetches the target message when it is not loaded in the active conversation', async () => {
+      const localCommit = vi.fn();
+      const localDispatch = vi.fn().mockResolvedValue();
+      const data = {
+        id: 42,
+        messages: [{ id: 100 }],
+        dataFetched: true,
+      };
+
+      await actions.setActiveChat(
+        { commit: localCommit, dispatch: localDispatch },
+        { data, after: 50 }
+      );
+
+      expect(localDispatch).toHaveBeenCalledWith('fetchPreviousMessages', {
+        after: 50,
+        before: 100,
+        conversationId: 42,
+      });
+    });
+
+    it('does not reload a target message that is already loaded', async () => {
+      const localCommit = vi.fn();
+      const localDispatch = vi.fn();
+      const data = {
+        id: 42,
+        messages: [{ id: 50 }],
+        dataFetched: true,
+      };
+
+      await actions.setActiveChat(
+        { commit: localCommit, dispatch: localDispatch },
+        { data, after: '50' }
+      );
+
+      expect(localDispatch).not.toHaveBeenCalled();
+    });
+
     it('should commit SET_CHAT_DATA_FETCHED by ID, not mutate the data object directly (race condition fix)', async () => {
       const localCommit = vi.fn();
       const localDispatch = vi.fn().mockResolvedValue();

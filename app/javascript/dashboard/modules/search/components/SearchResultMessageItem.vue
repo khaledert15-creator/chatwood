@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { frontendURL } from 'dashboard/helper/URLHelper.js';
+import { useRouter } from 'vue-router';
 import { dynamicTime } from 'shared/helpers/timeHelper';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
 import { useInbox } from 'dashboard/composables/useInbox';
@@ -43,18 +43,21 @@ const props = defineProps({
   },
 });
 
+const router = useRouter();
 const { inbox } = useInbox(props.inboxId);
 
-const navigateTo = computed(() => {
-  const params = {};
-  if (props.messageId) {
-    params.messageId = props.messageId;
-  }
-  return frontendURL(
-    `accounts/${props.accountId}/conversations/${props.id}`,
-    params
-  );
-});
+const navigateToMessage = () => {
+  if (!props.id) return;
+
+  router.push({
+    name: 'inbox_conversation',
+    params: {
+      accountId: props.accountId,
+      conversation_id: props.id,
+    },
+    query: props.messageId ? { messageId: props.messageId } : {},
+  });
+};
 
 const createdAtTime = computed(() => {
   if (!props.createdAt) return '';
@@ -83,10 +86,17 @@ const audioAttachments = computed(() => {
 </script>
 
 <template>
-  <router-link :to="navigateTo">
+  <div
+    role="link"
+    tabindex="0"
+    class="cursor-pointer"
+    @click="navigateToMessage"
+    @keydown.enter="navigateToMessage"
+    @keydown.space.prevent="navigateToMessage"
+  >
     <CardLayout
       layout="col"
-      class="[&>div]:justify-start [&>div]:gap-2 [&>div]:px-4 [&>div]:py-3 [&>div]:items-start hover:bg-n-slate-2 dark:hover:bg-n-solid-3"
+      class="[&>div]:justify-start [&>div]:gap-2 [&>div]:px-4 [&>div]:py-3 [&>div]:items-start transition-colors hover:bg-n-slate-2 dark:hover:bg-n-solid-3"
     >
       <div
         class="flex items-center min-w-0 justify-between gap-2 w-full h-7 mb-1"
@@ -145,7 +155,7 @@ const audioAttachments = computed(() => {
             class="bg-n-alpha-2 dark:bg-n-alpha-2 text-n-slate-12"
             :attachment="attachment"
             :show-transcribed-text="false"
-            @click.prevent
+            @click.stop.prevent
           />
           <div v-if="attachment.transcribedText" class="pt-2">
             <TranscribedText :text="attachment.transcribedText" />
@@ -165,5 +175,5 @@ const audioAttachments = computed(() => {
         />
       </div>
     </CardLayout>
-  </router-link>
+  </div>
 </template>

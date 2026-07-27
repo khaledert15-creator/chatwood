@@ -163,22 +163,34 @@ export default {
     setActiveChat() {
       if (this.conversationId) {
         const selectedConversation = this.findConversation();
-        // If conversation doesn't exist or selected conversation is same as the active
-        // conversation, don't set active conversation.
-        if (
-          !selectedConversation ||
-          selectedConversation.id === this.currentChat.id
-        ) {
+        if (!selectedConversation) {
           return;
         }
         const { messageId } = this.$route.query;
+        const isCurrentConversation =
+          selectedConversation.id === this.currentChat.id;
+        const isTargetMessageLoaded = selectedConversation.messages.some(
+          message => message.id.toString() === messageId?.toString()
+        );
+
+        if (isCurrentConversation && !messageId) {
+          return;
+        }
+
+        if (isCurrentConversation && isTargetMessageLoaded) {
+          emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, { messageId });
+          return;
+        }
+
         this.$store
           .dispatch('setActiveChat', {
             data: selectedConversation,
             after: messageId,
           })
           .then(() => {
-            emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, { messageId });
+            if (messageId) {
+              emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, { messageId });
+            }
           });
       } else {
         this.$store.dispatch('clearSelectedState');

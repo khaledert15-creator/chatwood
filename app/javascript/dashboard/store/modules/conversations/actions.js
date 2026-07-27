@@ -248,11 +248,14 @@ const actions = {
   async setActiveChat({ commit, dispatch }, { data, after }) {
     commit(types.SET_CURRENT_CHAT_WINDOW, data);
     commit(types.CLEAR_ALL_MESSAGES_LOADED, data.id);
-    if (data.dataFetched === undefined) {
+    const hasTargetMessage = data.messages.some(
+      message => message.id.toString() === after?.toString()
+    );
+    if (data.dataFetched === undefined || (after && !hasTargetMessage)) {
       try {
         await dispatch('fetchPreviousMessages', {
           after,
-          before: data.messages[0].id,
+          before: data.messages[0]?.id,
           conversationId: data.id,
         });
         commit(types.SET_CHAT_DATA_FETCHED, data.id);
