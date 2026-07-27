@@ -877,6 +877,7 @@ describe('#mutations', () => {
     it('should add conversation if not found on normal view', () => {
       const state = {
         allConversations: [],
+        conversationListIds: [2],
         conversationFilters: {},
       };
 
@@ -887,6 +888,7 @@ describe('#mutations', () => {
 
       mutations[types.UPDATE_CONVERSATION](state, conversation);
       expect(state.allConversations).toEqual([conversation]);
+      expect(state.conversationListIds).toEqual([2]);
     });
 
     it('should not add conversation if not found on participating view', () => {

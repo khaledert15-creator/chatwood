@@ -3,6 +3,64 @@ import { BUS_EVENTS } from 'shared/constants/busEvents';
 import ConversationView from './ConversationView.vue';
 
 describe('ConversationView', () => {
+  describe('findConversation', () => {
+    it('finds a conversation outside the filtered conversation list', () => {
+      const conversation = {
+        id: 42,
+        status: 'resolved',
+        messages: [],
+      };
+      const getConversationById = vi.fn().mockReturnValue(conversation);
+
+      const result = ConversationView.methods.findConversation.call({
+        conversationId: '42',
+        chatList: [],
+        getConversationById,
+      });
+
+      expect(getConversationById).toHaveBeenCalledWith(42);
+      expect(result).toBe(conversation);
+    });
+  });
+
+  describe('fetchConversationIfUnavailable', () => {
+    it('activates a conversation explicitly after fetching it', async () => {
+      const setActiveChat = vi.fn();
+      const dispatch = vi.fn().mockResolvedValue();
+      const context = {
+        conversationId: '42',
+        findConversation: vi.fn().mockReturnValue(undefined),
+        setActiveChat,
+        $store: { dispatch },
+      };
+
+      await ConversationView.methods.fetchConversationIfUnavailable.call(
+        context
+      );
+
+      expect(dispatch).toHaveBeenCalledWith('getConversation', '42');
+      expect(setActiveChat).toHaveBeenCalledOnce();
+    });
+
+    it('activates a conversation already in the store without fetching it', async () => {
+      const setActiveChat = vi.fn();
+      const dispatch = vi.fn();
+      const context = {
+        conversationId: 42,
+        findConversation: vi.fn().mockReturnValue({ id: 42 }),
+        setActiveChat,
+        $store: { dispatch },
+      };
+
+      await ConversationView.methods.fetchConversationIfUnavailable.call(
+        context
+      );
+
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(setActiveChat).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('setActiveChat', () => {
     it('scrolls to a loaded search result without reloading the active conversation', () => {
       const dispatch = vi.fn();

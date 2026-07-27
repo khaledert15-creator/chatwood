@@ -70,7 +70,7 @@ export default {
   },
   computed: {
     ...mapGetters({
-      chatList: 'getAllConversations',
+      getConversationById: 'getConversationById',
       currentChat: 'getSelectedChat',
     }),
     showConversationList() {
@@ -118,9 +118,6 @@ export default {
     this.$store.dispatch('portals/index');
     this.initialize();
     this.$watch('$store.state.route', () => this.initialize());
-    this.$watch('chatList.length', () => {
-      this.setActiveChat();
-    });
   },
 
   methods: {
@@ -146,19 +143,25 @@ export default {
         previously_used_conversation_display_type: newViewType,
       });
     },
-    fetchConversationIfUnavailable() {
+    async fetchConversationIfUnavailable() {
       if (!this.conversationId) {
         return;
       }
       const chat = this.findConversation();
-      if (!chat) {
-        this.$store.dispatch('getConversation', this.conversationId);
+      if (chat) {
+        this.setActiveChat();
+        return;
+      }
+
+      const conversationId = this.conversationId;
+      await this.$store.dispatch('getConversation', conversationId);
+      if (conversationId === this.conversationId) {
+        this.setActiveChat();
       }
     },
     findConversation() {
       const conversationId = parseInt(this.conversationId, 10);
-      const [chat] = this.chatList.filter(c => c.id === conversationId);
-      return chat;
+      return this.getConversationById(conversationId);
     },
     setActiveChat() {
       if (this.conversationId) {
