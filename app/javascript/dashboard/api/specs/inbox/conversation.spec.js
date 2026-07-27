@@ -46,6 +46,7 @@ describe('#ConversationAPI', () => {
         page: 1,
         labels: [],
         teamId: 1,
+        responseState: 'unread',
         updatedWithin: 20,
       });
       expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations', {
@@ -56,8 +57,31 @@ describe('#ConversationAPI', () => {
           assignee_type: 'me',
           page: 1,
           labels: [],
+          response_state: 'unread',
           updated_within: 20,
         },
+      });
+    });
+
+    it('#get needs reply conversations', () => {
+      conversationAPI.get({
+        inboxId: 2,
+        status: 'active',
+        assigneeType: 'all',
+        page: 1,
+        responseState: 'needs_reply',
+        sortBy: 'last_activity_at_desc',
+      });
+
+      expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations', {
+        params: expect.objectContaining({
+          inbox_id: 2,
+          status: 'active',
+          assignee_type: 'all',
+          page: 1,
+          response_state: 'needs_reply',
+          sort_by: 'last_activity_at_desc',
+        }),
       });
     });
 
@@ -155,6 +179,7 @@ describe('#ConversationAPI', () => {
         assigneeType: 'me',
         labels: [],
         teamId: 1,
+        responseState: 'new',
       });
       expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations/meta', {
         params: {
@@ -163,6 +188,7 @@ describe('#ConversationAPI', () => {
           status: 'open',
           assignee_type: 'me',
           labels: [],
+          response_state: 'new',
         },
       });
     });

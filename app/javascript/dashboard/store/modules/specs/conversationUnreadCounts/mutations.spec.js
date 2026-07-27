@@ -48,6 +48,7 @@ describe('#mutations', () => {
         participatingCount: 9,
         unattendedCount: 0,
         folders: { 10: 11 },
+        unreadResponseCount: 0,
       });
     });
 
@@ -74,6 +75,7 @@ describe('#mutations', () => {
         participatingCount: 0,
         unattendedCount: 0,
         folders: {},
+        unreadResponseCount: 0,
       });
     });
 

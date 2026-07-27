@@ -36,6 +36,26 @@
         "TEXT": "الكل"
       }
     },
+    "RESPONSE_STATE_FILTER_ITEMS": {
+      "all": {
+        "TEXT": "الكل"
+      },
+      "unread": {
+        "TEXT": "غير مقروءة"
+      },
+      "needs_reply": {
+        "TEXT": "تحتاج رد"
+      },
+      "mine": {
+        "TEXT": "محادثاتي"
+      },
+      "snoozed": {
+        "TEXT": "مؤجلة"
+      },
+      "resolved": {
+        "TEXT": "مغلقة"
+      }
+    },
     "VIEW_FILTER": "عرض",
     "SORT_TOOLTIP_LABEL": "ترتيب المحادثات",
     "CHAT_SORT": {

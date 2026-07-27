@@ -56,6 +56,83 @@ describe('#hasMessageFailedWithExternalError', () => {
 });
 
 describe('#actions', () => {
+  describe('#refreshActiveConversationFilter', () => {
+    it('upserts a conversation when the backend says it matches', async () => {
+      const conversation = { id: 7 };
+      axios.get.mockResolvedValue({
+        data: { data: { payload: [conversation] } },
+      });
+
+      await actions.refreshActiveConversationFilter(
+        {
+          commit,
+          state: {
+            conversationFilters: {
+              status: 'active',
+              responseState: 'needs_reply',
+              page: 3,
+            },
+          },
+        },
+        { conversationId: 7 }
+      );
+
+      expect(axios.get).toHaveBeenCalledWith('/api/v1/conversations', {
+        params: expect.objectContaining({
+          status: 'active',
+          response_state: 'needs_reply',
+          page: 1,
+        }),
+      });
+      expect(commit).toHaveBeenCalledWith(types.SET_ALL_CONVERSATION, [
+        conversation,
+      ]);
+    });
+
+    it('removes a conversation when it is absent from the filtered first page', async () => {
+      axios.get.mockResolvedValue({ data: { data: { payload: [] } } });
+
+      await actions.refreshActiveConversationFilter(
+        { commit, state: { conversationFilters: { status: 'active' } } },
+        { conversationId: 7 }
+      );
+
+      expect(commit).toHaveBeenCalledWith(
+        types.EXCLUDE_CONVERSATION_FROM_LIST,
+        7
+      );
+    });
+
+    it('ignores a response from an older filter generation', async () => {
+      let resolveRequest;
+      axios.get.mockReturnValue(
+        new Promise(resolve => {
+          resolveRequest = resolve;
+        })
+      );
+      const state = {
+        conversationFilters: {
+          status: 'active',
+          responseState: 'unread',
+        },
+        filterGeneration: 1,
+      };
+
+      const request = actions.refreshActiveConversationFilter(
+        { commit, state },
+        { conversationId: 7 }
+      );
+      state.conversationFilters = { status: 'resolved' };
+      state.filterGeneration = 2;
+      resolveRequest({
+        data: { data: { payload: [{ id: 7, status: 'open' }] } },
+      });
+      await request;
+
+      expect(commit).not.toHaveBeenCalled();
+    });
+  });
+
   describe('#getConversation', () => {
     it('sends correct actions if API is success', async () => {
       axios.get.mockResolvedValue({
@@ -759,6 +836,44 @@ describe('#addMentions', () => {
         [types.SET_CURRENT_CHAT_WINDOW, data],
         [types.CLEAR_ALL_MESSAGES_LOADED, 42],
       ]);
+      expect(localDispatch).not.toHaveBeenCalled();
+    });
+
+    it('fetches the target message when it is not loaded in the active conversation', async () => {
+      const localCommit = vi.fn();
+      const localDispatch = vi.fn().mockResolvedValue();
+      const data = {
+        id: 42,
+        messages: [{ id: 100 }],
+        dataFetched: true,
+      };
+
+      await actions.setActiveChat(
+        { commit: localCommit, dispatch: localDispatch },
+        { data, after: 50 }
+      );
+
+      expect(localDispatch).toHaveBeenCalledWith('fetchPreviousMessages', {
+        after: 50,
+        before: 100,
+        conversationId: 42,
+      });
+    });
+
+    it('does not reload a target message that is already loaded', async () => {
+      const localCommit = vi.fn();
+      const localDispatch = vi.fn();
+      const data = {
+        id: 42,
+        messages: [{ id: 50 }],
+        dataFetched: true,
+      };
+
+      await actions.setActiveChat(
+        { commit: localCommit, dispatch: localDispatch },
+        { data, after: '50' }
+      );
+
       expect(localDispatch).not.toHaveBeenCalled();
     });
 

@@ -144,7 +144,8 @@ RSpec.describe 'Conversations API', type: :request do
             'all_count' => 1,
             'inboxes' => { visible_inbox.id.to_s => 1 },
             'labels' => { label.id.to_s => 1 },
-            'teams' => {}
+            'teams' => {},
+            'unread_response_count' => 1
           )
         end
 

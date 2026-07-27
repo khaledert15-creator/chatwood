@@ -10,6 +10,7 @@ import { CONTENT_TYPES } from 'dashboard/components-next/message/constants.js';
 
 const state = {
   allConversations: [],
+  conversationListIds: [],
   attachments: {},
   listLoadingStatus: true,
   chatStatusFilter: wootConstants.STATUS_TYPE.OPEN,
@@ -22,6 +23,7 @@ const state = {
   conversationLastSeen: null,
   syncConversationsMessages: {},
   conversationFilters: {},
+  filterGeneration: 0,
   copilotAssistant: {},
 };
 
@@ -32,8 +34,12 @@ const getConversationById = _state => conversationId => {
 // mutations
 export const mutations = {
   [types.SET_ALL_CONVERSATION](_state, conversationList) {
+    _state.conversationListIds ||= [];
     const newAllConversations = [..._state.allConversations];
     conversationList.forEach(conversation => {
+      if (!_state.conversationListIds.includes(conversation.id)) {
+        _state.conversationListIds.push(conversation.id);
+      }
       const indexInCurrentList = newAllConversations.findIndex(
         c => c.id === conversation.id
       );
@@ -61,7 +67,18 @@ export const mutations = {
   },
   [types.EMPTY_ALL_CONVERSATION](_state) {
     _state.allConversations = [];
+    _state.conversationListIds = [];
     _state.selectedChatId = null;
+  },
+  [types.CLEAR_CONVERSATION_LIST](_state) {
+    const selectedConversation = _state.allConversations.find(
+      conversation => conversation.id === _state.selectedChatId
+    );
+    _state.allConversations = selectedConversation
+      ? [selectedConversation]
+      : [];
+    _state.conversationListIds = [];
+    _state.filterGeneration = (_state.filterGeneration || 0) + 1;
   },
   [types.SET_ALL_MESSAGES_LOADED](_state, conversationId) {
     const chat = getConversationById(_state)(conversationId);
@@ -104,6 +121,19 @@ export const mutations = {
 
   [types.SET_CURRENT_CHAT_WINDOW](_state, activeChat) {
     if (activeChat) {
+      const previousSelectedId = _state.selectedChatId;
+      const previousIsListed =
+        _state.conversationListIds?.includes(previousSelectedId);
+      if (
+        previousSelectedId &&
+        previousSelectedId !== activeChat.id &&
+        !previousIsListed &&
+        _state.allConversations
+      ) {
+        _state.allConversations = _state.allConversations.filter(
+          conversation => conversation.id !== previousSelectedId
+        );
+      }
       _state.selectedChatId = activeChat.id;
     }
   },
@@ -229,15 +259,29 @@ export const mutations = {
   },
 
   [types.ADD_CONVERSATION](_state, conversation) {
+    _state.conversationListIds ||= [];
     const exists = _state.allConversations.some(c => c.id === conversation.id);
     if (!exists) {
       _state.allConversations.push(conversation);
     }
+    if (!_state.conversationListIds.includes(conversation.id)) {
+      _state.conversationListIds.push(conversation.id);
+    }
   },
 
   [types.DELETE_CONVERSATION](_state, conversationId) {
+    _state.conversationListIds ||= [];
     _state.allConversations = _state.allConversations.filter(
       c => c.id !== conversationId
+    );
+    _state.conversationListIds = _state.conversationListIds.filter(
+      id => id !== conversationId
+    );
+  },
+  [types.EXCLUDE_CONVERSATION_FROM_LIST](_state, conversationId) {
+    _state.conversationListIds ||= [];
+    _state.conversationListIds = _state.conversationListIds.filter(
+      id => id !== conversationId
     );
   },
 
@@ -363,10 +407,20 @@ export const mutations = {
   },
 
   [types.SET_CHAT_LIST_FILTERS](_state, data) {
+    _state.filterGeneration ||= 0;
     _state.conversationFilters = data;
+    _state.filterGeneration += 1;
   },
   [types.UPDATE_CHAT_LIST_FILTERS](_state, data) {
-    _state.conversationFilters = { ..._state.conversationFilters, ...data };
+    _state.filterGeneration ||= 0;
+    const nextFilters = { ..._state.conversationFilters, ...data };
+    const scopeChanged =
+      JSON.stringify({ ..._state.conversationFilters, page: undefined }) !==
+      JSON.stringify({ ...nextFilters, page: undefined });
+    _state.conversationFilters = nextFilters;
+    if (scopeChanged) {
+      _state.filterGeneration += 1;
+    }
   },
   [types.SET_INBOX_CAPTAIN_ASSISTANT](_state, data) {
     _state.copilotAssistant = data.assistant;

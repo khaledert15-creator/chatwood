@@ -57,6 +57,16 @@ describe('#findPendingMessageIndex', () => {
 });
 
 describe('#applyPageFilters', () => {
+  describe('#filter-active-status', () => {
+    it('includes open and pending conversations but excludes resolved conversations', () => {
+      const filters = { status: 'active' };
+
+      expect(applyPageFilters(conversationList[0], filters)).toBe(true);
+      expect(applyPageFilters(conversationList[3], filters)).toBe(true);
+      expect(applyPageFilters(conversationList[2], filters)).toBe(false);
+    });
+  });
+
   describe('#filter-team', () => {
     it('returns true if conversation has team and team filter is active', () => {
       const filters = {

@@ -14,16 +14,21 @@ export const getSelectedChatConversation = ({
 }) =>
   allConversations.filter(conversation => conversation.id === selectedChatId);
 
+const getListedConversations = ({ allConversations, conversationListIds }) => {
+  if (!conversationListIds) return allConversations;
+
+  return allConversations.filter(conversation =>
+    conversationListIds.includes(conversation.id)
+  );
+};
+
 const getters = {
-  getAllConversations: ({ allConversations, chatSortFilter: sortKey }) => {
-    return allConversations.sort((a, b) => sortComparator(a, b, sortKey));
+  getAllConversations: _state => {
+    return getListedConversations(_state).sort((a, b) =>
+      sortComparator(a, b, _state.chatSortFilter)
+    );
   },
-  getFilteredConversations: (
-    { allConversations, chatSortFilter, appliedFilters },
-    _,
-    __,
-    rootGetters
-  ) => {
+  getFilteredConversations: (_state, _, __, rootGetters) => {
     const currentUser = rootGetters.getCurrentUser;
     const currentUserId = rootGetters.getCurrentUser.id;
     const currentAccountId = rootGetters.getCurrentAccountId;
@@ -31,11 +36,11 @@ const getters = {
     const permissions = getUserPermissions(currentUser, currentAccountId);
     const userRole = getUserRole(currentUser, currentAccountId);
 
-    return allConversations
+    return getListedConversations(_state)
       .filter(conversation => {
         const matchesFilterResult = matchesFilters(
           conversation,
-          appliedFilters
+          _state.appliedFilters
         );
         const allowedForRole = applyRoleFilter(
           conversation,
@@ -46,7 +51,7 @@ const getters = {
 
         return matchesFilterResult && allowedForRole;
       })
-      .sort((a, b) => sortComparator(a, b, chatSortFilter));
+      .sort((a, b) => sortComparator(a, b, _state.chatSortFilter));
   },
   getSelectedChat: ({ selectedChatId, allConversations }) => {
     const selectedChat = allConversations.find(
@@ -60,6 +65,7 @@ const getters = {
   getSelectedChatAttachmentsLoaded: ({ selectedChatId, attachments }) =>
     selectedChatId !== null && attachments[selectedChatId] !== undefined,
   getChatListFilters: ({ conversationFilters }) => conversationFilters,
+  getChatListFilterGeneration: ({ filterGeneration }) => filterGeneration,
   getLastEmailInSelectedChat: (stage, _getters) => {
     const selectedChat = _getters.getSelectedChat;
     const { messages = [] } = selectedChat;
@@ -77,7 +83,7 @@ const getters = {
   getMineChats: (_state, _, __, rootGetters) => activeFilters => {
     const currentUserID = rootGetters.getCurrentUser?.id;
 
-    return _state.allConversations.filter(conversation => {
+    return getListedConversations(_state).filter(conversation => {
       const { assignee } = conversation.meta;
       const isAssignedToMe = assignee && assignee.id === currentUserID;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
@@ -98,7 +104,7 @@ const getters = {
     return hasAppliedFilters ? filterQueryGenerator(_state.appliedFilters) : [];
   },
   getUnAssignedChats: _state => activeFilters => {
-    return _state.allConversations.filter(conversation => {
+    return getListedConversations(_state).filter(conversation => {
       const isUnAssigned = !conversation.meta.assignee;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       return isUnAssigned && shouldFilter;
@@ -107,7 +113,7 @@ const getters = {
   getParticipatingChats: (_state, _, __, rootGetters) => activeFilters => {
     const currentUserId = rootGetters.getCurrentUser?.id;
     const getWatchers = rootGetters['conversationWatchers/getByConversationId'];
-    return _state.allConversations.filter(conversation => {
+    return getListedConversations(_state).filter(conversation => {
       const watchers = getWatchers(conversation.id);
       // Watchers are only loaded for the conversation open in the detail
       // panel. If loaded and current user is not in them, filter it out.
@@ -125,7 +131,7 @@ const getters = {
     const permissions = getUserPermissions(currentUser, currentAccountId);
     const userRole = getUserRole(currentUser, currentAccountId);
 
-    return _state.allConversations.filter(conversation => {
+    return getListedConversations(_state).filter(conversation => {
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       const allowedForRole = applyRoleFilter(
         conversation,
