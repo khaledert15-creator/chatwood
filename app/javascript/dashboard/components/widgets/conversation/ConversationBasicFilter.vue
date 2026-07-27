@@ -31,14 +31,12 @@ const { t } = useI18n();
 
 const { updateUISettings } = useUISettings();
 
-const chatStatusFilter = useMapGetter('getChatStatusFilter');
 const chatSortFilter = useMapGetter('getChatSortFilter');
+const unreadCount = useMapGetter(
+  'conversationUnreadCounts/getUnreadResponseCount'
+);
 
 const [showActionsDropdown, toggleDropdown] = useToggle();
-
-const currentStatusFilter = computed(() => {
-  return chatStatusFilter.value || wootConstants.STATUS_TYPE.OPEN;
-});
 
 const currentSortBy = computed(() => {
   return (
@@ -48,28 +46,47 @@ const currentSortBy = computed(() => {
 
 const responseStateOptions = computed(() => [
   {
-    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT'),
-    value: 'all',
-    status: 'all',
-    responseState: '',
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.needs_reply.TEXT'),
+    value: 'needs_reply',
+    status: 'active',
+    responseState: 'needs_reply',
+    assigneeType: 'all',
   },
   {
     label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.unread.TEXT'),
     value: 'unread',
-    status: 'all',
+    status: 'active',
     responseState: 'unread',
+    assigneeType: 'all',
+    count: unreadCount.value,
   },
   {
-    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.new.TEXT'),
-    value: 'new',
-    status: 'open',
-    responseState: 'new',
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.mine.TEXT'),
+    value: 'mine',
+    status: 'active',
+    responseState: 'mine',
+    assigneeType: 'me',
+  },
+  {
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT'),
+    value: 'all',
+    status: 'active',
+    responseState: 'all',
+    assigneeType: 'all',
+  },
+  {
+    label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.snoozed.TEXT'),
+    value: 'snoozed',
+    status: 'snoozed',
+    responseState: 'snoozed',
+    assigneeType: 'all',
   },
   {
     label: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.resolved.TEXT'),
     value: 'resolved',
     status: 'resolved',
-    responseState: '',
+    responseState: 'resolved',
+    assigneeType: 'all',
   },
 ]);
 
@@ -119,23 +136,8 @@ const chatSortOptions = computed(() => [
 const activeResponseState = computed(() => {
   if (props.activeResponseState) return props.activeResponseState;
   if (props.activeStatus === 'resolved') return 'resolved';
-  if (props.activeStatus === 'all') return 'all';
-  return '';
-});
-
-const legacyStatusLabels = computed(() => ({
-  open: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
-  pending: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
-  snoozed: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
-}));
-
-const activeResponseStateLabel = computed(() => {
-  const selectedOption = responseStateOptions.value.find(
-    option => option.value === activeResponseState.value
-  );
-  if (selectedOption) return selectedOption.label;
-
-  return legacyStatusLabels.value[props.activeStatus] || '';
+  if (props.activeStatus === 'snoozed') return 'snoozed';
+  return 'all';
 });
 
 const activeChatSortLabel = computed(
@@ -151,7 +153,7 @@ const saveSelectedFilter = (type, value) => {
       : null;
   updateUISettings({
     conversations_filter_by: {
-      status: selectedResponseState?.status || currentStatusFilter.value,
+      status: selectedResponseState?.status || props.activeStatus,
       response_state:
         selectedResponseState !== null
           ? selectedResponseState.responseState
@@ -180,47 +182,62 @@ const handleSortChange = value => {
 </script>
 
 <template>
-  <div class="relative flex">
-    <NextButton
-      v-tooltip.right="$t('CHAT_LIST.SORT_TOOLTIP_LABEL')"
-      icon="i-lucide-arrow-up-down"
-      slate
-      faded
-      xs
-      @click="toggleDropdown()"
-    />
+  <div class="flex items-center min-w-0 gap-1">
     <div
-      v-if="showActionsDropdown"
-      v-on-click-outside="() => toggleDropdown()"
-      class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 absolute z-40 top-full"
-      :class="{
-        'ltr:left-0 rtl:right-0': !isOnExpandedLayout,
-        'ltr:right-0 rtl:left-0': isOnExpandedLayout,
-      }"
+      class="flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      dir="rtl"
     >
-      <div class="flex items-center justify-between last:mt-4 gap-2">
-        <span class="text-sm truncate text-n-slate-12">
-          {{ $t('CHAT_LIST.CHAT_SORT.STATUS') }}
+      <button
+        v-for="option in responseStateOptions"
+        :key="option.value"
+        type="button"
+        class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg border transition-colors"
+        :class="
+          activeResponseState === option.value
+            ? 'bg-n-brand text-white border-n-brand'
+            : 'bg-n-alpha-2 text-n-slate-11 border-n-weak hover:bg-n-alpha-3'
+        "
+        @click="handleResponseStateChange(option.value)"
+      >
+        <span>{{ option.label }}</span>
+        <span
+          v-if="option.count"
+          class="min-w-4 px-1 rounded-full bg-n-alpha-3 text-[10px]"
+        >
+          {{ option.count }}
         </span>
-        <SelectMenu
-          :model-value="activeResponseState"
-          :options="responseStateOptions"
-          :label="activeResponseStateLabel"
-          :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
-          @update:model-value="handleResponseStateChange"
-        />
-      </div>
-      <div class="flex items-center justify-between last:mt-4 gap-2">
-        <span class="text-sm truncate text-n-slate-12">
-          {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
-        </span>
-        <SelectMenu
-          :model-value="chatSortFilter"
-          :options="chatSortOptions"
-          :label="activeChatSortLabel"
-          :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
-          @update:model-value="handleSortChange"
-        />
+      </button>
+    </div>
+    <div class="relative shrink-0">
+      <NextButton
+        v-tooltip.right="$t('CHAT_LIST.SORT_TOOLTIP_LABEL')"
+        icon="i-lucide-arrow-up-down"
+        slate
+        faded
+        xs
+        @click="toggleDropdown()"
+      />
+      <div
+        v-if="showActionsDropdown"
+        v-on-click-outside="() => toggleDropdown()"
+        class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-64 rounded-xl p-4 absolute z-40 top-full"
+        :class="{
+          'ltr:left-0 rtl:right-0': !isOnExpandedLayout,
+          'ltr:right-0 rtl:left-0': isOnExpandedLayout,
+        }"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm truncate text-n-slate-12">
+            {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
+          </span>
+          <SelectMenu
+            :model-value="chatSortFilter"
+            :options="chatSortOptions"
+            :label="activeChatSortLabel"
+            :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
+            @update:model-value="handleSortChange"
+          />
+        </div>
       </div>
     </div>
   </div>

@@ -161,39 +161,26 @@ class ConversationFinder
   end
 
   def filter_by_status
+    if params[:status] == 'active'
+      @conversations = @conversations.where(status: Conversations::ResponseStateFilter::ACTIVE_STATUSES)
+      return
+    end
+
     return if params[:status] == 'all'
 
     @conversations = @conversations.where(status: params[:status] || DEFAULT_STATUS)
   end
 
   def filter_by_response_state
-    case params[:response_state]
-    when 'unread'
-      filter_by_unread_response_state
-    when 'new'
+    if %w[unread needs_reply].include?(params[:response_state])
+      @conversations = Conversations::ResponseStateFilter.new(
+        relation: @conversations,
+        user: current_user,
+        account: current_account
+      ).perform(params[:response_state])
+    elsif params[:response_state] == 'new'
       @conversations = @conversations.where(first_reply_created_at: nil)
     end
-  end
-
-  def filter_by_unread_response_state
-    messages = Message.arel_table
-    conversations = Conversation.arel_table
-    current_user_last_seen_at = Arel::Nodes::Case.new
-                                                 .when(conversations[:assignee_id].eq(current_user.id))
-                                                 .then(conversations[:assignee_last_seen_at])
-                                                 .else(conversations[:agent_last_seen_at])
-    unread_message = messages
-                     .project(Arel.sql('1'))
-                     .where(messages[:conversation_id].eq(conversations[:id]))
-                     .where(messages[:account_id].eq(current_account.id))
-                     .where(messages[:message_type].eq(Message.message_types[:incoming]))
-                     .where(messages[:private].eq(false))
-                     .where(
-                       current_user_last_seen_at.eq(nil)
-                         .or(messages[:created_at].gt(current_user_last_seen_at))
-                     )
-
-    @conversations = @conversations.where(unread_message.exists)
   end
 
   def filter_by_team

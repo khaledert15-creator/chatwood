@@ -19,6 +19,8 @@ import {
   syncConversationCallVisibility,
 } from 'dashboard/helper/voice';
 
+const conversationFilterRefreshVersions = new Map();
+
 export const hasMessageFailedWithExternalError = pendingMessage => {
   // This helper is used to check if the message has failed with an external error.
   // We have two cases
@@ -61,6 +63,54 @@ const actions = {
     }
   },
 
+  refreshActiveConversationFilter: async (
+    { commit, state },
+    { conversationId }
+  ) => {
+    const filterGeneration = state.filterGeneration;
+    const refreshVersion =
+      (conversationFilterRefreshVersions.get(conversationId) || 0) + 1;
+    conversationFilterRefreshVersions.set(conversationId, refreshVersion);
+
+    try {
+      const params = { ...state.conversationFilters, page: 1 };
+      const {
+        data: {
+          data: { payload },
+        },
+      } = await ConversationApi.get(params);
+      const isLatestConversationRequest =
+        conversationFilterRefreshVersions.get(conversationId) ===
+        refreshVersion;
+      if (
+        !isLatestConversationRequest ||
+        state.filterGeneration !== filterGeneration
+      ) {
+        if (isLatestConversationRequest) {
+          conversationFilterRefreshVersions.delete(conversationId);
+        }
+        return;
+      }
+      const matchingConversation = payload.find(
+        conversation => conversation.id === conversationId
+      );
+
+      if (matchingConversation) {
+        commit(types.SET_ALL_CONVERSATION, [matchingConversation]);
+      } else {
+        commit(types.EXCLUDE_CONVERSATION_FROM_LIST, conversationId);
+      }
+      conversationFilterRefreshVersions.delete(conversationId);
+    } catch (error) {
+      if (
+        conversationFilterRefreshVersions.get(conversationId) === refreshVersion
+      ) {
+        conversationFilterRefreshVersions.delete(conversationId);
+      }
+      // A later realtime event or an explicit list refresh will retry.
+    }
+  },
+
   fetchFilteredConversations: async ({ commit, dispatch }, params) => {
     commit(types.SET_LIST_LOADING_STATUS);
     try {
@@ -78,6 +128,10 @@ const actions = {
 
   emptyAllConversations({ commit }) {
     commit(types.EMPTY_ALL_CONVERSATION);
+  },
+
+  clearConversationList({ commit }) {
+    commit(types.CLEAR_CONVERSATION_LIST);
   },
 
   clearSelectedState({ commit }) {

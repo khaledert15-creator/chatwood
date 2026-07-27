@@ -24,6 +24,20 @@ describe ConversationFinder do
   end
 
   describe '#perform' do
+    context 'with active status' do
+      let(:params) { { status: 'active', assignee_type: 'all' } }
+
+      it 'includes open, pending, and snoozed conversations but excludes resolved conversations' do
+        pending_conversation = create(:conversation, account: account, inbox: inbox, status: 'pending')
+        snoozed_conversation = create(:conversation, account: account, inbox: inbox, status: 'snoozed')
+
+        result = conversation_finder.perform[:conversations]
+
+        expect(result.map(&:status).uniq).to contain_exactly('open', 'pending', 'snoozed')
+        expect(result.map(&:id)).to include(pending_conversation.id, snoozed_conversation.id)
+      end
+    end
+
     context 'with status' do
       let(:params) { { status: 'open', assignee_type: 'me' } }
 
@@ -158,7 +172,7 @@ describe ConversationFinder do
     end
 
     context 'with unread response state' do
-      let(:params) { { status: 'all', response_state: 'unread' } }
+      let(:params) { { status: 'active', response_state: 'unread' } }
 
       it 'returns only conversations with public incoming messages after agent last seen' do
         unread_conversation = create(:conversation, account: account, inbox: inbox,
@@ -189,13 +203,13 @@ describe ConversationFinder do
 
         expect(conversation_ids).to include(
           unread_conversation.id,
-          unseen_conversation.id,
-          resolved_unread_conversation.id
+          unseen_conversation.id
         )
         expect(conversation_ids).not_to include(
           read_conversation.id,
           private_conversation.id,
-          outgoing_conversation.id
+          outgoing_conversation.id,
+          resolved_unread_conversation.id
         )
       end
 
@@ -274,6 +288,67 @@ describe ConversationFinder do
                          message_type: :incoming, private: false, created_at: 5.minutes.ago)
 
         expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
+      end
+    end
+
+    context 'with needs reply response state' do
+      let(:params) { { status: 'active', response_state: 'needs_reply' } }
+
+      it 'returns active conversations whose last meaningful message is from the customer' do
+        needs_reply = create(:conversation, account: account, inbox: inbox)
+        replied = create(:conversation, account: account, inbox: inbox)
+        pending = create(:conversation, account: account, inbox: inbox, status: 'pending')
+        snoozed = create(:conversation, account: account, inbox: inbox, status: 'snoozed')
+        resolved = create(:conversation, account: account, inbox: inbox, status: 'resolved')
+
+        [needs_reply, replied, pending, snoozed, resolved].each do |conversation|
+          create(:message, account: account, inbox: inbox, conversation: conversation,
+                           message_type: :incoming, created_at: 10.minutes.ago)
+        end
+        create(:message, account: account, inbox: inbox, conversation: replied,
+                         message_type: :outgoing, sender: user_1, created_at: 5.minutes.ago)
+
+        conversation_ids = conversation_finder.perform[:conversations].map(&:id)
+
+        expect(conversation_ids).to include(needs_reply.id, pending.id, snoozed.id)
+        expect(conversation_ids).not_to include(replied.id, resolved.id)
+      end
+
+      it 'ignores private, activity, template, bot, automation, campaign, and unverifiable external echo messages' do
+        conversation = create(:conversation, account: account, inbox: inbox)
+        agent_bot = create(:agent_bot, account: account)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, created_at: 10.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, private: true, sender: user_1, created_at: 9.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :activity, sender: user_1, created_at: 8.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :template, sender: user_1, created_at: 7.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: agent_bot, created_at: 6.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: user_1,
+                         content_attributes: { automation_rule_id: 1 }, created_at: 5.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: user_1,
+                         additional_attributes: { campaign_id: 1 }, created_at: 4.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: agent_bot,
+                         content_attributes: { external_echo: true }, created_at: 3.minutes.ago)
+
+        expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
+      end
+
+      it 'treats a verified User external echo as a human reply' do
+        conversation = create(:conversation, account: account, inbox: inbox)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, created_at: 10.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: user_1,
+                         content_attributes: { external_echo: true }, created_at: 5.minutes.ago)
+
+        expect(conversation_finder.perform[:conversations].map(&:id)).not_to include(conversation.id)
       end
     end
 

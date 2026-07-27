@@ -12,7 +12,6 @@ import ConversationList from './ConversationList.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import ConversationFilter from 'next/filter/ConversationFilter.vue';
 import SaveCustomView from 'next/filter/SaveCustomView.vue';
-import ChatTypeTabs from './widgets/ChatTypeTabs.vue';
 import DeleteCustomViews from 'dashboard/routes/dashboard/customviews/DeleteCustomViews.vue';
 import ConversationBulkActions from './widgets/conversation/conversationBulkActions/Index.vue';
 import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirection.vue';
@@ -31,7 +30,7 @@ import {
 import { useEmitter } from 'dashboard/composables/emitter';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
 
-import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 import wootConstants from 'dashboard/constants/globals';
 import advancedFilterOptions from './widgets/conversation/advancedFilterItems';
@@ -72,9 +71,9 @@ const store = useStore();
 
 const resolveAttributesModalRef = ref(null);
 
-const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
-const activeStatus = ref(wootConstants.STATUS_TYPE.ALL);
-const activeResponseState = ref('');
+const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ALL);
+const activeStatus = ref('active');
+const activeResponseState = ref('needs_reply');
 const activeSortBy = ref(wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC);
 const showAdvancedFilters = ref(false);
 // chatsOnView is to store the chats that are currently visible on the screen,
@@ -248,16 +247,22 @@ const conversationListPagination = computed(() => {
 });
 
 const conversationFilters = computed(() => {
+  const responseState = ['unread', 'needs_reply'].includes(
+    activeResponseState.value
+  )
+    ? activeResponseState.value
+    : undefined;
+
   return {
     inboxId: props.conversationInbox ? props.conversationInbox : undefined,
     assigneeType: activeAssigneeTab.value,
     status: activeStatus.value,
-    responseState: activeResponseState.value || undefined,
+    responseState,
     sortBy: activeSortBy.value,
     page: conversationListPagination.value,
-    labels: props.label ? [props.label] : undefined,
-    teamId: props.teamId || undefined,
-    conversationType: props.conversationType || undefined,
+    labels: undefined,
+    teamId: undefined,
+    conversationType: undefined,
   };
 });
 
@@ -383,8 +388,23 @@ const uniqueInboxes = computed(() => {
 function setFiltersFromUISettings() {
   const { conversations_filter_by: filterBy = {} } = uiSettings.value;
   const { status, response_state: responseState, order_by: orderBy } = filterBy;
-  activeStatus.value = status || wootConstants.STATUS_TYPE.ALL;
-  activeResponseState.value = responseState || '';
+  if (responseState === 'new') {
+    activeStatus.value = 'active';
+    activeResponseState.value = 'needs_reply';
+  } else {
+    activeResponseState.value =
+      responseState ||
+      (['resolved', 'snoozed'].includes(status) ? status : 'all');
+    activeStatus.value = ['resolved', 'snoozed'].includes(
+      activeResponseState.value
+    )
+      ? activeResponseState.value
+      : 'active';
+  }
+  activeAssigneeTab.value =
+    activeResponseState.value === 'mine'
+      ? wootConstants.ASSIGNEE_TYPE.ME
+      : wootConstants.ASSIGNEE_TYPE.ALL;
   activeSortBy.value = Object.values(wootConstants.SORT_BY_TYPE).includes(
     orderBy
   )
@@ -425,7 +445,7 @@ function onApplyFilter(payload) {
   resetBulkActions();
   foldersQuery.value = filterQueryGenerator(payload);
   store.dispatch('conversationPage/reset');
-  store.dispatch('emptyAllConversations');
+  store.dispatch('clearConversationList');
   fetchFilteredConversations(payload);
 }
 
@@ -579,7 +599,7 @@ function resetAndFetchData() {
   appliedFilter.value = [];
   resetBulkActions();
   store.dispatch('conversationPage/reset');
-  store.dispatch('emptyAllConversations');
+  store.dispatch('clearConversationList');
   store.dispatch('clearConversationFilters');
   if (hasActiveFolders.value) {
     const payload = activeFolder.value.query;
@@ -606,21 +626,11 @@ function loadMoreConversations() {
   }
 }
 
-function updateAssigneeTab(selectedTab) {
-  if (activeAssigneeTab.value !== selectedTab) {
-    resetBulkActions();
-    emitter.emit('clearSearchInput');
-    activeAssigneeTab.value = selectedTab;
-    if (!currentPage.value) {
-      fetchConversations();
-    }
-  }
-}
-
 function onBasicFilterChange(value, type) {
   if (type === 'responseState') {
     activeStatus.value = value.status;
     activeResponseState.value = value.responseState;
+    activeAssigneeTab.value = value.assigneeType;
   } else {
     activeSortBy.value = value;
   }
@@ -809,6 +819,14 @@ useEmitter('fetch_conversation_stats', () => {
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
+useEmitter(
+  BUS_EVENTS.REFRESH_ACTIVE_CONVERSATION_FILTER,
+  ({ conversationId }) => {
+    if (hasAppliedFiltersOrActiveFolders.value) return;
+    store.dispatch('refreshActiveConversationFilter', { conversationId });
+  }
+);
+
 onMounted(() => {
   store.dispatch('setChatListFilters', conversationFilters.value);
   setFiltersFromUISettings();
@@ -930,14 +948,6 @@ watch(conversationFilters, (newVal, oldVal) => {
       :custom-views-id="foldersId"
       :open-last-item-after-delete="openLastItemAfterDeleteInFolder"
       @close="onCloseDeleteFoldersModal"
-    />
-
-    <ChatTypeTabs
-      v-if="!hasAppliedFiltersOrActiveFolders"
-      :items="assigneeTabItems"
-      :active-tab="activeAssigneeTab"
-      is-compact
-      @chat-tab-change="updateAssigneeTab"
     />
 
     <p

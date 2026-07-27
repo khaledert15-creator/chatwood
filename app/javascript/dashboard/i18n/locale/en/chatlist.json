@@ -43,8 +43,14 @@
       "unread": {
         "TEXT": "Unread"
       },
-      "new": {
-        "TEXT": "New"
+      "needs_reply": {
+        "TEXT": "Needs reply"
+      },
+      "mine": {
+        "TEXT": "Mine"
+      },
+      "snoozed": {
+        "TEXT": "Snoozed"
       },
       "resolved": {
         "TEXT": "Closed"

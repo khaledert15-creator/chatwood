@@ -9,6 +9,7 @@ export const state = {
   mentionsCount: 0,
   participatingCount: 0,
   unattendedCount: 0,
+  unreadResponseCount: 0,
   folders: {},
 };
 
@@ -50,6 +51,9 @@ export const getters = {
   getUnattendedUnreadCount($state) {
     return $state.unattendedCount;
   },
+  getUnreadResponseCount($state) {
+    return $state.unreadResponseCount;
+  },
   getFolderUnreadCount: $state => folderId => {
     return $state.folders[String(folderId)] || 0;
   },
@@ -90,6 +94,7 @@ export const mutations = {
     $state.mentionsCount = normalizeCount(payload.mentions_count);
     $state.participatingCount = normalizeCount(payload.participating_count);
     $state.unattendedCount = normalizeCount(payload.unattended_count);
+    $state.unreadResponseCount = normalizeCount(payload.unread_response_count);
     $state.folders = normalizeCounts(payload.folders);
   },
 };

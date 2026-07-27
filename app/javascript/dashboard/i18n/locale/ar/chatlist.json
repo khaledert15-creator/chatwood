@@ -43,8 +43,14 @@
       "unread": {
         "TEXT": "غير مقروءة"
       },
-      "new": {
-        "TEXT": "جديدة"
+      "needs_reply": {
+        "TEXT": "تحتاج رد"
+      },
+      "mine": {
+        "TEXT": "محادثاتي"
+      },
+      "snoozed": {
+        "TEXT": "مؤجلة"
       },
       "resolved": {
         "TEXT": "مغلقة"

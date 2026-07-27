@@ -63,6 +63,28 @@ describe('#ConversationAPI', () => {
       });
     });
 
+    it('#get needs reply conversations', () => {
+      conversationAPI.get({
+        inboxId: 2,
+        status: 'active',
+        assigneeType: 'all',
+        page: 1,
+        responseState: 'needs_reply',
+        sortBy: 'last_activity_at_desc',
+      });
+
+      expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations', {
+        params: expect.objectContaining({
+          inbox_id: 2,
+          status: 'active',
+          assignee_type: 'all',
+          page: 1,
+          response_state: 'needs_reply',
+          sort_by: 'last_activity_at_desc',
+        }),
+      });
+    });
+
     it('#search', () => {
       conversationAPI.search({
         q: 'leads',

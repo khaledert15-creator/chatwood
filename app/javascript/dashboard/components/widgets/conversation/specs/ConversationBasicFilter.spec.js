@@ -11,8 +11,12 @@ vi.mock('dashboard/composables/useUISettings', () => ({
 }));
 
 vi.mock('dashboard/composables/store.js', () => ({
-  useMapGetter: key =>
-    ref(key === 'getChatStatusFilter' ? 'all' : 'last_activity_at_desc'),
+  useMapGetter: key => {
+    if (key === 'conversationUnreadCounts/getUnreadResponseCount') {
+      return ref(4);
+    }
+    return ref('last_activity_at_desc');
+  },
   useStore: () => ({ dispatch }),
 }));
 
@@ -22,7 +26,9 @@ vi.mock('vue-i18n', () => ({
       ({
         'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT': 'الكل',
         'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.unread.TEXT': 'غير مقروءة',
-        'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.new.TEXT': 'جديدة',
+        'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.needs_reply.TEXT': 'تحتاج رد',
+        'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.mine.TEXT': 'محادثاتي',
+        'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.snoozed.TEXT': 'مؤجلة',
         'CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.resolved.TEXT': 'مغلقة',
       })[key] || key,
   }),
@@ -61,11 +67,11 @@ describe('ConversationBasicFilter', () => {
     dispatch.mockClear();
   });
 
-  it('shows the simplified response-state labels', async () => {
+  it('shows the primary filters in priority order', () => {
     const wrapper = mountFilter();
 
     expect(wrapper.vm.responseStateOptions.map(option => option.label)).toEqual(
-      ['الكل', 'غير مقروءة', 'جديدة', 'مغلقة']
+      ['تحتاج رد', 'غير مقروءة', 'محادثاتي', 'الكل', 'مؤجلة', 'مغلقة']
     );
   });
 
@@ -77,16 +83,32 @@ describe('ConversationBasicFilter', () => {
 
     expect(wrapper.emitted('changeFilter')).toContainEqual([
       expect.objectContaining({
-        status: 'all',
+        status: 'active',
         responseState: 'unread',
+        assigneeType: 'all',
       }),
       'responseState',
     ]);
     expect(updateUISettings).toHaveBeenCalledWith({
       conversations_filter_by: expect.objectContaining({
-        status: 'all',
+        status: 'active',
         response_state: 'unread',
       }),
     });
+  });
+
+  it('emits an independent mine filter', () => {
+    const wrapper = mountFilter();
+
+    wrapper.vm.handleResponseStateChange('mine');
+
+    expect(wrapper.emitted('changeFilter')).toContainEqual([
+      expect.objectContaining({
+        status: 'active',
+        responseState: 'mine',
+        assigneeType: 'me',
+      }),
+      'responseState',
+    ]);
   });
 });

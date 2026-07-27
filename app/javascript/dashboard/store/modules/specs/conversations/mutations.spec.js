@@ -1,6 +1,7 @@
 import { describe } from 'vitest';
 import types from '../../../mutation-types';
 import { mutations } from '../../conversations';
+import getters from '../../conversations/getters';
 
 vi.mock('shared/helpers/mitt', () => ({
   emitter: {
@@ -13,6 +14,78 @@ vi.mock('shared/helpers/mitt', () => ({
 import { emitter } from 'shared/helpers/mitt';
 
 describe('#mutations', () => {
+  describe('#CLEAR_CONVERSATION_LIST', () => {
+    it('keeps the selected conversation data while clearing visible list ids', () => {
+      const selectedConversation = {
+        id: 1,
+        messages: [{ id: 10, content: 'kept' }],
+      };
+      const state = {
+        allConversations: [selectedConversation, { id: 2, messages: [] }],
+        conversationListIds: [1, 2],
+        selectedChatId: 1,
+        chatSortFilter: 'last_activity_at_desc',
+      };
+
+      mutations[types.CLEAR_CONVERSATION_LIST](state);
+
+      expect(state.allConversations).toEqual([selectedConversation]);
+      expect(state.conversationListIds).toEqual([]);
+      expect(getters.getSelectedChat(state)).toEqual(selectedConversation);
+      expect(getters.getAllConversations(state)).toEqual([]);
+    });
+  });
+
+  describe('#EXCLUDE_CONVERSATION_FROM_LIST', () => {
+    it('hides a selected conversation from the list without deleting its messages', () => {
+      const selectedConversation = {
+        id: 1,
+        messages: [{ id: 10, content: 'kept' }],
+      };
+      const state = {
+        allConversations: [selectedConversation],
+        conversationListIds: [1],
+        selectedChatId: 1,
+        chatSortFilter: 'last_activity_at_desc',
+      };
+
+      mutations[types.EXCLUDE_CONVERSATION_FROM_LIST](state, 1);
+
+      expect(getters.getSelectedChat(state).messages).toHaveLength(1);
+      expect(getters.getAllConversations(state)).toEqual([]);
+    });
+  });
+
+  describe('#SET_ALL_CONVERSATION realtime list membership', () => {
+    it('adds a matching conversation at the top without duplicating it', () => {
+      const state = {
+        allConversations: [
+          { id: 1, last_activity_at: 1, messages: [], meta: {} },
+        ],
+        conversationListIds: [1],
+        selectedChatId: null,
+        chatSortFilter: 'last_activity_at_desc',
+      };
+      const incomingConversation = {
+        id: 2,
+        last_activity_at: 10,
+        messages: [],
+        meta: {},
+      };
+
+      mutations[types.SET_ALL_CONVERSATION](state, [incomingConversation]);
+      mutations[types.SET_ALL_CONVERSATION](state, [incomingConversation]);
+
+      expect(getters.getAllConversations(state).map(({ id }) => id)).toEqual([
+        2, 1,
+      ]);
+      expect(state.conversationListIds).toEqual([1, 2]);
+      expect(state.allConversations.filter(({ id }) => id === 2)).toHaveLength(
+        1
+      );
+    });
+  });
+
   describe('#EMPTY_ALL_CONVERSATION', () => {
     it('empty conversations', () => {
       const state = { allConversations: [{ id: 1 }], selectedChatId: 1 };
@@ -520,6 +593,7 @@ describe('#mutations', () => {
       const state = { conversationFilters: conversationFilters };
       mutations[types.SET_CHAT_LIST_FILTERS](state, conversationFilters);
       expect(state.conversationFilters).toEqual(conversationFilters);
+      expect(state.filterGeneration).toBe(1);
     });
   });
 
@@ -552,6 +626,18 @@ describe('#mutations', () => {
         conversationType: 'mention',
         updatedWithin: 20,
       });
+      expect(state.filterGeneration).toBe(1);
+    });
+
+    it('does not change generation when only pagination changes', () => {
+      const state = {
+        conversationFilters: { status: 'active', page: 1 },
+        filterGeneration: 3,
+      };
+
+      mutations[types.UPDATE_CHAT_LIST_FILTERS](state, { page: 2 });
+
+      expect(state.filterGeneration).toBe(3);
     });
   });
 

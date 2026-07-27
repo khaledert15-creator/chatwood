@@ -45,7 +45,9 @@ const formattedAllCount = computed(() => formatNumber(allCount.value));
 const responseStateLabels = computed(() => ({
   all: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.all.TEXT'),
   unread: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.unread.TEXT'),
-  new: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.new.TEXT'),
+  needs_reply: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.needs_reply.TEXT'),
+  mine: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.mine.TEXT'),
+  snoozed: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.snoozed.TEXT'),
   resolved: t('CHAT_LIST.RESPONSE_STATE_FILTER_ITEMS.resolved.TEXT'),
 }));
 
@@ -84,7 +86,7 @@ const toggleConversationLayout = () => {
 
 <template>
   <div
-    class="flex items-center justify-between gap-2 px-3 h-[3.25rem]"
+    class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 min-h-[3.25rem]"
     :class="{
       'border-b border-n-strong': hasAppliedFiltersOrActiveFolders,
     }"
@@ -181,17 +183,18 @@ const toggleConversationLayout = () => {
           :class="{ 'ltr:right-0 rtl:left-0': isOnExpandedLayout }"
         />
       </div>
-      <ConversationBasicFilter
-        v-if="!hasAppliedFiltersOrActiveFolders"
-        :active-status="activeStatus"
-        :active-response-state="activeResponseState"
-        :is-on-expanded-layout="isOnExpandedLayout"
-        @change-filter="onBasicFilterChange"
-      />
       <SwitchLayout
         :is-on-expanded-layout="isOnExpandedLayout"
         @toggle="toggleConversationLayout"
       />
     </div>
+    <ConversationBasicFilter
+      v-if="!hasAppliedFiltersOrActiveFolders"
+      class="w-full"
+      :active-status="activeStatus"
+      :active-response-state="activeResponseState"
+      :is-on-expanded-layout="isOnExpandedLayout"
+      @change-filter="onBasicFilterChange"
+    />
   </div>
 </template>

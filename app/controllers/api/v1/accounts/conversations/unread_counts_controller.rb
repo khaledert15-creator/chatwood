@@ -13,7 +13,20 @@ class Api::V1::Accounts::Conversations::UnreadCountsController < Api::V1::Accoun
   private
 
   def unread_counts
-    ::Conversations::UnreadCounts::Counter.new(account: Current.account, user: Current.user).perform
+    ::Conversations::UnreadCounts::Counter.new(account: Current.account, user: Current.user).perform.merge(response_state_counts)
+  end
+
+  def response_state_counts
+    relation = ::Conversations::PermissionFilterService.new(
+      Current.account.conversations,
+      Current.user,
+      Current.account
+    ).perform
+    filter = ::Conversations::ResponseStateFilter.new(relation: relation, user: Current.user, account: Current.account)
+
+    {
+      unread_response_count: filter.perform('unread').count
+    }
   end
 
   def filtered_unread_counts_enabled?

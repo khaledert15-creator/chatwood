@@ -14,9 +14,10 @@ import {
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { MESSAGE_TYPE } from 'shared/constants/messages';
 
 const { isImpersonating } = useImpersonation();
-const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 5000;
+const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 1000;
 const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS = 30000;
 const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS = 15000;
 const MENTION_UNREAD_COUNTS_REFETCH_DELAY_MS =
@@ -30,11 +31,12 @@ class ActionCableConnector extends BaseActionCableConnector {
     const { websocketURL = '' } = window.chatwootConfig || {};
     super(app, pubsubToken, websocketURL);
     this.CancelTyping = [];
-    this.lastUnreadCountsFetchAt = null;
     this.unreadCountsFetchTimer = null;
+    this.pendingUnreadCountsRefresh = false;
     this.mentionUnreadCountsFetchTimer = null;
     this.mentionUnreadCountsRetryTimer = null;
     this.filteredUnreadCountsRetryTimer = null;
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.events = {
       'message.created': this.onMessageCreated,
       'message.updated': this.onMessageUpdated,
@@ -83,6 +85,10 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onMessageUpdated = data => {
     this.app.$store.dispatch('updateMessage', data);
+    if (this.isCountRelevantMessage(data)) {
+      this.refreshActiveConversationFilter(data.conversation_id);
+      this.throttledFetchConversationUnreadCounts();
+    }
   };
 
   onPresenceUpdate = data => {
@@ -107,6 +113,7 @@ class ActionCableConnector extends BaseActionCableConnector {
     const { id } = payload;
     if (id) {
       this.app.$store.dispatch('updateConversation', payload);
+      this.refreshActiveConversationFilter(id);
     }
     this.fetchConversationStats();
   };
@@ -118,6 +125,8 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onConversationRead = data => {
     this.app.$store.dispatch('updateConversation', data);
+    this.refreshActiveConversationFilter(data.id);
+    this.throttledFetchConversationUnreadCounts();
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -134,6 +143,10 @@ class ActionCableConnector extends BaseActionCableConnector {
       lastActivityAt,
       conversationId,
     });
+    if (this.isCountRelevantMessage(data)) {
+      this.refreshActiveConversationFilter(conversationId);
+      this.throttledFetchConversationUnreadCounts();
+    }
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -142,6 +155,8 @@ class ActionCableConnector extends BaseActionCableConnector {
   onStatusChange = data => {
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
+    this.refreshActiveConversationFilter(data.id);
+    this.throttledFetchConversationUnreadCounts();
   };
 
   onConversationUpdated = data => {
@@ -150,7 +165,31 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onConversationUnreadCountChanged = () => {
-    this.refreshConversationUnreadCountsWithFilteredRetry();
+    this.throttledFetchConversationUnreadCounts();
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  refreshActiveConversationFilter = conversationId => {
+    emitter.emit(BUS_EVENTS.REFRESH_ACTIVE_CONVERSATION_FILTER, {
+      conversationId,
+    });
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  isCountRelevantMessage = message => {
+    if (message.private) return false;
+    if (message.message_type === MESSAGE_TYPE.INCOMING) return true;
+    if (
+      message.message_type !== MESSAGE_TYPE.OUTGOING ||
+      message.sender_type !== 'User'
+    ) {
+      return false;
+    }
+
+    return (
+      !message.content_attributes?.automation_rule_id &&
+      !message.additional_attributes?.campaign_id
+    );
   };
 
   refreshConversationUnreadCountsWithFilteredRetry = () => {
@@ -159,24 +198,27 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   throttledFetchConversationUnreadCounts = () => {
-    const now = Date.now();
-    const elapsedTime = now - this.lastUnreadCountsFetchAt;
+    this.pendingUnreadCountsRefresh = true;
+    this.clearUnreadCountsFetchTimer();
 
-    if (
-      this.lastUnreadCountsFetchAt === null ||
-      elapsedTime >= UNREAD_COUNTS_REFETCH_THROTTLE_MS
-    ) {
-      this.clearUnreadCountsFetchTimer();
-      this.fetchConversationUnreadCounts();
+    if (document.visibilityState === 'hidden') {
       return;
     }
 
-    if (this.unreadCountsFetchTimer) return;
-
     this.unreadCountsFetchTimer = setTimeout(() => {
       this.unreadCountsFetchTimer = null;
+      this.pendingUnreadCountsRefresh = false;
       this.fetchConversationUnreadCounts();
-    }, UNREAD_COUNTS_REFETCH_THROTTLE_MS - elapsedTime);
+    }, UNREAD_COUNTS_REFETCH_THROTTLE_MS);
+  };
+
+  onVisibilityChange = () => {
+    if (
+      document.visibilityState === 'visible' &&
+      this.pendingUnreadCountsRefresh
+    ) {
+      this.throttledFetchConversationUnreadCounts();
+    }
   };
 
   clearUnreadCountsFetchTimer = () => {
@@ -234,7 +276,6 @@ class ActionCableConnector extends BaseActionCableConnector {
   fetchConversationUnreadCounts = () => {
     if (!this.isConversationUnreadCountsEnabled()) return;
 
-    this.lastUnreadCountsFetchAt = Date.now();
     this.app.$store.dispatch('conversationUnreadCounts/get');
   };
 
