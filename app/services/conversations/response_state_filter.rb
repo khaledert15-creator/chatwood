@@ -61,7 +61,7 @@ class Conversations::ResponseStateFilter
       .where(account_id: account.id, private: false)
       .where(conversation_id: account.conversations.where(status: ACTIVE_STATUSES).select(:id))
       .where(message_type: [Message.message_types[:incoming], Message.message_types[:outgoing]])
-      .where(json_attribute(:content_attributes, 'automation_rule_id').eq(nil))
+      .where("(messages.content_attributes #>> '{}')::jsonb ->> 'automation_rule_id' IS NULL")
       .where(json_attribute(:additional_attributes, 'campaign_id').eq(nil))
       .where(human_message)
   end

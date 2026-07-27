@@ -329,15 +329,23 @@ describe ConversationFinder do
                          message_type: :outgoing, sender: agent_bot, created_at: 6.minutes.ago)
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :outgoing, sender: user_1,
-                         content_attributes: { automation_rule_id: 1 }, created_at: 5.minutes.ago)
-        create(:message, account: account, inbox: inbox, conversation: conversation,
-                         message_type: :outgoing, sender: user_1,
                          additional_attributes: { campaign_id: 1 }, created_at: 4.minutes.ago)
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :outgoing, sender: agent_bot,
                          content_attributes: { external_echo: true }, created_at: 3.minutes.ago)
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :incoming, created_at: 10.minutes.ago)
+
+        expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
+      end
+
+      it 'ignores automated outgoing messages from users' do
+        conversation = create(:conversation, account: account, inbox: inbox)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, created_at: 10.minutes.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :outgoing, sender: user_1,
+                         content_attributes: { automation_rule_id: 1 }, created_at: 5.minutes.ago)
 
         expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
       end
