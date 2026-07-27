@@ -41,17 +41,23 @@ class Conversations::ResponseStateFilter
   end
 
   def unread_message_query
-    messages
+    unread_messages.where(last_seen_at.eq(nil).or(messages[:created_at].gt(last_seen_at)))
+  end
+
+  def unread_messages
+    public_account_messages
       .project(Arel.sql('1'))
       .where(messages[:conversation_id].eq(conversations[:id]))
-      .where(messages[:account_id].eq(account.id))
       .where(messages[:message_type].eq(Message.message_types[:incoming]))
-      .where(messages[:private].eq(false))
-      .where(last_seen_at.eq(nil).or(messages[:created_at].gt(last_seen_at)))
+  end
+
+  def public_account_messages
+    messages.where(messages[:account_id].eq(account.id)).where(messages[:private].eq(false))
   end
 
   def meaningful_messages
-    Message.unscoped
+    Message
+      .unscoped
       .where(account_id: account.id, private: false)
       .where(conversation_id: account.conversations.where(status: ACTIVE_STATUSES).select(:id))
       .where(message_type: [Message.message_types[:incoming], Message.message_types[:outgoing]])

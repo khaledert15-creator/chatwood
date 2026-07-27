@@ -320,8 +320,6 @@ describe ConversationFinder do
         conversation = create(:conversation, account: account, inbox: inbox)
         agent_bot = create(:agent_bot, account: account)
         create(:message, account: account, inbox: inbox, conversation: conversation,
-                         message_type: :incoming, created_at: 10.minutes.ago)
-        create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :outgoing, private: true, sender: user_1, created_at: 9.minutes.ago)
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :activity, sender: user_1, created_at: 8.minutes.ago)
@@ -338,7 +336,8 @@ describe ConversationFinder do
         create(:message, account: account, inbox: inbox, conversation: conversation,
                          message_type: :outgoing, sender: agent_bot,
                          content_attributes: { external_echo: true }, created_at: 3.minutes.ago)
-        conversation.update!(status: :open)
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, created_at: 10.minutes.ago)
 
         expect(conversation_finder.perform[:conversations].map(&:id)).to include(conversation.id)
       end

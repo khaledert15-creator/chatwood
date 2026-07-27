@@ -116,7 +116,6 @@ class ConversationFinder
       current_account
     ).perform
     filter_by_conversation_type if params[:conversation_type]
-    @conversations
   end
 
   def filter_by_assignee_type
