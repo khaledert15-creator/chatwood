@@ -52,6 +52,7 @@ import {
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
 import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions.js';
+import { initializeConversationStatus } from 'dashboard/helper/chatListFilterHelper';
 
 const props = defineProps({
   conversationInbox: { type: [String, Number], default: 0 },
@@ -64,7 +65,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['conversationLoad']);
-const { uiSettings } = useUISettings();
+const { uiSettings, updateUISettings } = useUISettings();
 const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
@@ -380,8 +381,8 @@ const uniqueInboxes = computed(() => {
 // ---------------------- Methods -----------------------
 function setFiltersFromUISettings() {
   const { conversations_filter_by: filterBy = {} } = uiSettings.value;
-  const { status, order_by: orderBy } = filterBy;
-  activeStatus.value = status || wootConstants.STATUS_TYPE.OPEN;
+  const { order_by: orderBy } = filterBy;
+  activeStatus.value = initializeConversationStatus(filterBy, updateUISettings);
   activeSortBy.value = Object.values(wootConstants.SORT_BY_TYPE).includes(
     orderBy
   )
