@@ -1,12 +1,7 @@
 class Conversations::UnreadCounts::FilteredCountStore
   extend Conversations::UnreadCounts::FilteredCountStoreKeys
 
-  SnapshotResult = Struct.new(:status, :payload, keyword_init: true) do
-    def fresh? = status == :fresh
-    def stale? = status == :stale
-    def expired? = status == :expired
-    def missing? = status == :missing
-  end
+  SnapshotResult = Conversations::UnreadCounts::FilteredCountSnapshotResult
 
   VERSION_KEY_METHODS = {
     conversation: :conversation_version_key,
@@ -42,6 +37,7 @@ class Conversations::UnreadCounts::FilteredCountStore
         meta: meta
       )
       write_snapshot(built_in_filter_counts_key(account_id, user_id), payload)
+      Redis::Alfred.delete(built_in_filter_refresh_throttle_key(account_id, user_id))
     end
 
     def built_in_filter_counts(account_id:, user_id:)
@@ -66,6 +62,7 @@ class Conversations::UnreadCounts::FilteredCountStore
         filter_ids: Array(filter_ids).map(&:to_i)
       )
       write_snapshot(folder_index_key(account_id, user_id), payload)
+      Redis::Alfred.delete(folder_index_refresh_throttle_key(account_id, user_id))
     end
 
     def folder_index(account_id:, user_id:)
@@ -93,6 +90,7 @@ class Conversations::UnreadCounts::FilteredCountStore
         meta: meta
       )
       write_snapshot(filter_count_key(account_id, filter_id), payload)
+      Redis::Alfred.delete(filter_refresh_throttle_key(account_id, filter_id))
     end
 
     def filter_count(account_id:, filter_id:)
@@ -177,11 +175,14 @@ class Conversations::UnreadCounts::FilteredCountStore
     end
 
     def snapshot_state(snapshot, versions:, now:)
-      return SnapshotResult.new(status: :missing, payload: nil) if snapshot.blank?
-      return SnapshotResult.new(status: :expired, payload: snapshot) unless inside_stale_window?(snapshot, now)
-      return SnapshotResult.new(status: :fresh, payload: snapshot) if versions_match?(snapshot, versions) && inside_fresh_window?(snapshot, now)
+      return SnapshotResult.new(status: :missing, payload: nil, version_mismatch: false) if snapshot.blank?
 
-      SnapshotResult.new(status: :stale, payload: snapshot)
+      versions_match = versions_match?(snapshot, versions)
+      version_mismatch = !versions_match
+      return SnapshotResult.new(status: :expired, payload: snapshot, version_mismatch: version_mismatch) unless inside_stale_window?(snapshot, now)
+      return SnapshotResult.new(status: :fresh, payload: snapshot, version_mismatch: false) if versions_match && inside_fresh_window?(snapshot, now)
+
+      SnapshotResult.new(status: :stale, payload: snapshot, version_mismatch: version_mismatch)
     end
 
     def versions_match?(snapshot, versions)

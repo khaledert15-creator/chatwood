@@ -919,6 +919,116 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
       end
 
+      it 'returns updated built-in and saved folder counts immediately after the last unread conversation is read' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.update!(agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        create(:mention, account: account, conversation: conversation, user: agent)
+        custom_filter = create(
+          :custom_filter,
+          account: account,
+          user: agent,
+          filter_type: :conversation,
+          query: {
+            payload: [{
+              attribute_key: 'status',
+              attribute_model: 'standard',
+              filter_operator: 'equal_to',
+              values: ['open']
+            }]
+          }
+        )
+        headers = agent.create_new_auth_token
+
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: headers, as: :json
+        expect(response.parsed_body['payload']).to include(
+          'mentions_count' => 1,
+          'folders' => { custom_filter.id.to_s => 1 }
+        )
+
+        allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen", headers: headers, as: :json
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+          'conversation.unread_count_changed',
+          kind_of(Time),
+          conversation: conversation
+        )
+
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: headers, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload']).to include(
+          'all_count' => 0,
+          'mentions_count' => 0,
+          'folders' => {}
+        )
+      ensure
+        Conversations::UnreadCounts::Store.clear_account!(account.id)
+      end
+
+      it 'keeps a saved folder count when a conversation outside that folder is read' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.inbox.update!(enable_auto_assignment: false)
+        conversation.update!(status: :pending, agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        matching_conversation = create(:conversation, account: account, inbox: conversation.inbox, status: :open, agent_last_seen_at: 1.hour.ago)
+        create(
+          :message,
+          account: account,
+          inbox: conversation.inbox,
+          conversation: matching_conversation,
+          message_type: :incoming,
+          created_at: 5.minutes.ago
+        )
+        custom_filter = create(
+          :custom_filter,
+          account: account,
+          user: agent,
+          filter_type: :conversation,
+          query: {
+            payload: [{
+              attribute_key: 'status',
+              attribute_model: 'standard',
+              filter_operator: 'equal_to',
+              values: ['open']
+            }]
+          }
+        )
+        headers = agent.create_new_auth_token
+
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: headers, as: :json
+        expect(response.parsed_body.dig('payload', 'folders')).to eq(custom_filter.id.to_s => 1)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen", headers: headers, as: :json
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: headers, as: :json
+
+        expect(response.parsed_body.dig('payload', 'folders')).to eq(custom_filter.id.to_s => 1)
+      ensure
+        Conversations::UnreadCounts::Store.clear_account!(account.id)
+      end
+
+      it 'returns zero immediately when another agent reads the last unread conversation' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: other_agent, inbox: conversation.inbox)
+        conversation.update!(agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        create(:mention, account: account, conversation: conversation, user: agent)
+        agent_headers = agent.create_new_auth_token
+
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: agent_headers, as: :json
+        expect(response.parsed_body.dig('payload', 'mentions_count')).to eq(1)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: other_agent.create_new_auth_token,
+             as: :json
+        get "/api/v1/accounts/#{account.id}/conversations/unread_counts", headers: agent_headers, as: :json
+
+        expect(response.parsed_body.dig('payload', 'mentions_count')).to eq(0)
+      ensure
+        Conversations::UnreadCounts::Store.clear_account!(account.id)
+      end
+
       it 'notifies clients when marking read only affects filtered counts' do
         account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
         conversation.update!(agent_last_seen_at: 1.hour.ago)
