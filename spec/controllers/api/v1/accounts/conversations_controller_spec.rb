@@ -968,6 +968,7 @@ RSpec.describe 'Conversations API', type: :request do
 
       it 'keeps a saved folder count when a conversation outside that folder is read' do
         account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.inbox.update!(enable_auto_assignment: false)
         conversation.update!(status: :pending, agent_last_seen_at: 1.hour.ago)
         create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
         matching_conversation = create(:conversation, account: account, inbox: conversation.inbox, status: :open, agent_last_seen_at: 1.hour.ago)

@@ -1,13 +1,7 @@
 class Conversations::UnreadCounts::FilteredCountStore
   extend Conversations::UnreadCounts::FilteredCountStoreKeys
 
-  SnapshotResult = Struct.new(:status, :payload, :version_mismatch, keyword_init: true) do
-    def fresh? = status == :fresh
-    def stale? = status == :stale
-    def expired? = status == :expired
-    def missing? = status == :missing
-    def version_mismatch? = version_mismatch == true
-  end
+  SnapshotResult = Conversations::UnreadCounts::FilteredCountSnapshotResult
 
   VERSION_KEY_METHODS = {
     conversation: :conversation_version_key,
@@ -186,9 +180,7 @@ class Conversations::UnreadCounts::FilteredCountStore
       versions_match = versions_match?(snapshot, versions)
       version_mismatch = !versions_match
       return SnapshotResult.new(status: :expired, payload: snapshot, version_mismatch: version_mismatch) unless inside_stale_window?(snapshot, now)
-      if versions_match && inside_fresh_window?(snapshot, now)
-        return SnapshotResult.new(status: :fresh, payload: snapshot, version_mismatch: false)
-      end
+      return SnapshotResult.new(status: :fresh, payload: snapshot, version_mismatch: false) if versions_match && inside_fresh_window?(snapshot, now)
 
       SnapshotResult.new(status: :stale, payload: snapshot, version_mismatch: version_mismatch)
     end
