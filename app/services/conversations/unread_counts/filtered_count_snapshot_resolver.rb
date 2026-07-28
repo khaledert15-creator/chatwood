@@ -16,7 +16,7 @@ class Conversations::UnreadCounts::FilteredCountSnapshotResolver
     return state.payload if state.fresh?
 
     stale_payload = state.payload if state.stale?
-    return stale_payload if refresh_not_due?(stale_payload)
+    return stale_payload if !state.version_mismatch? && refresh_not_due?(stale_payload)
     return stale_payload unless refresh_claimed?(scope, claim_refresh)
 
     build_with_lock(scope, lock_key, stale_payload, &)

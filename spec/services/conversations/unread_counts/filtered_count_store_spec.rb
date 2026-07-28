@@ -227,6 +227,39 @@ RSpec.describe Conversations::UnreadCounts::FilteredCountStore do
       expect(described_class.claim_folder_index_refresh!(account_id: account_id, user_id: user_id)).to be(true)
       expect(described_class.claim_filter_refresh!(account_id: account_id, filter_id: filter_id)).to be(true)
     end
+
+    it 'releases refresh claims after snapshots are written successfully' do
+      expect(described_class.claim_built_in_filter_refresh!(account_id: account_id, user_id: user_id)).to be(true)
+      expect(described_class.claim_folder_index_refresh!(account_id: account_id, user_id: user_id)).to be(true)
+      expect(described_class.claim_filter_refresh!(account_id: account_id, filter_id: filter_id)).to be(true)
+
+      described_class.write_built_in_filter_counts!(
+        account_id: account_id,
+        user_id: user_id,
+        account_version: 0,
+        built_in_filter_version: 0,
+        counts: {}
+      )
+      described_class.write_folder_index!(
+        account_id: account_id,
+        user_id: user_id,
+        folder_index_version: 0,
+        filter_ids: []
+      )
+      described_class.write_filter_count!(
+        account_id: account_id,
+        filter_id: filter_id,
+        user_id: user_id,
+        count: 0,
+        account_version: 0,
+        filter_version: 0,
+        owner_built_in_filter_version: 0
+      )
+
+      expect(described_class.claim_built_in_filter_refresh!(account_id: account_id, user_id: user_id)).to be(true)
+      expect(described_class.claim_folder_index_refresh!(account_id: account_id, user_id: user_id)).to be(true)
+      expect(described_class.claim_filter_refresh!(account_id: account_id, filter_id: filter_id)).to be(true)
+    end
   end
 
   describe 'Redis access pattern' do

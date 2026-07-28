@@ -38,7 +38,7 @@ RSpec.describe Conversations::UnreadCounts::FilteredCounter do
     )
   end
 
-  it 'returns stale built-in counts until the refresh interval elapses' do
+  it 'refreshes version-mismatched built-in counts before the refresh interval elapses' do
     mentioned = create_visible_unread_conversation
     create(:mention, account: account, conversation: mentioned, user: agent)
 
@@ -53,15 +53,6 @@ RSpec.describe Conversations::UnreadCounts::FilteredCounter do
         account: account,
         user: agent,
         now: now + Conversations::UnreadCounts::FILTERED_COUNT_MIN_REFRESH_INTERVAL - 1.second
-      ).perform[:mentions_count]
-    ).to eq(1)
-
-    Redis::Alfred.delete(store.built_in_filter_refresh_throttle_key(account.id, agent.id))
-    expect(
-      described_class.new(
-        account: account,
-        user: agent,
-        now: now + Conversations::UnreadCounts::FILTERED_COUNT_MIN_REFRESH_INTERVAL + 1.second
       ).perform[:mentions_count]
     ).to eq(2)
   end
