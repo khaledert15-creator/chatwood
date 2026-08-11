@@ -355,6 +355,7 @@
     "REPORTS_SLA": "SLA",
     "REPORTS_BOT": "رد آلي",
     "REPORTS_AGENT": "وكيل الدعم",
+    "REPORTS_AGENT_PERFORMANCE": "أداء الموظفين",
     "REPORTS_LABEL": "الوسوم",
     "REPORTS_INBOX": "صندوق الوارد",
     "REPORTS_TEAM": "الفريق",

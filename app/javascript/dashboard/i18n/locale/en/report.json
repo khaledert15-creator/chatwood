@@ -674,16 +674,29 @@
     "SLA": "Response SLA",
     "MANUAL": "Manual messages",
     "TEMPLATES": "Manual template messages",
+    "TOTAL_MESSAGES": "Total customer-facing messages",
     "AVERAGE": "Average response",
     "MEDIAN": "Median response",
     "P90": "P90 response",
     "FIRST_RESPONSE": "First response",
+    "FASTEST_RESPONSE": "Fastest response",
+    "SLOWEST_RESPONSE": "Slowest response",
     "ELIGIBLE": "Eligible responses",
     "EXCLUDED": "Excluded responses",
     "HOURLY": "Messages by hour",
     "HOUR": "Hour",
     "DISTRIBUTION": "Response distribution",
     "EXCLUSIONS": "Excluded response reasons",
+    "AGENT": "Agent",
+    "SELECT_AGENT": "Select agent",
+    "DATE": "Date",
+    "SECONDS": "{value}s",
+    "MINUTES": "{value}m",
+    "TOOLTIPS": {
+      "P90": "90% of responses were completed within this time or less.",
+      "MEDIAN": "Half of responses were faster than this time, and half were slower.",
+      "SLA": "The percentage of responses completed within the specified time."
+    },
     "BUCKETS": {
       "bucket_under_1m": "Under 1 minute",
       "bucket_1_to_3m": "1–3 minutes",
@@ -706,6 +719,8 @@
     "STATUS": {
       "target_achieved": "Target achieved",
       "below_target": "Below target",
+      "above_target": "Above target",
+      "within_target": "Within target",
       "not_configured": "Not configured",
       "no_eligible_responses": "No eligible responses"
     }
