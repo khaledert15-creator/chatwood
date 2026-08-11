@@ -12,7 +12,7 @@ import PerformanceMetricCard from './PerformanceMetricCard.vue';
 import TargetCard from './TargetCard.vue';
 
 const store = useStore();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const report = ref(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -75,11 +75,16 @@ const exclusionRows = computed(() => [
       report.value?.response_eligibility?.exclusion_reasons
         ?.invalid_waiting_episode,
   },
+  {
+    label: t('AGENT_PERFORMANCE.EXCLUSION_REASONS.non_human_response'),
+    value:
+      report.value?.response_eligibility?.exclusion_reasons?.non_human_response,
+  },
 ]);
 const freshnessTime = computed(() => {
   const timestamp = report.value?.freshness?.data_fresh_as_of;
   return timestamp
-    ? new Date(timestamp).toLocaleTimeString([], {
+    ? new Date(timestamp).toLocaleTimeString(locale.value, {
         hour: '2-digit',
         minute: '2-digit',
       })
@@ -87,13 +92,17 @@ const freshnessTime = computed(() => {
 });
 const trackingStartTime = computed(() => {
   const timestamp = report.value?.analytics_tracking_started_at;
-  return timestamp ? new Date(timestamp).toLocaleString() : null;
+  return timestamp ? new Date(timestamp).toLocaleString(locale.value) : null;
 });
 
 const formatSeconds = value => {
   if (value == null) return '—';
-  if (value < 60) return `${Math.round(value)}s`;
-  return `${(value / 60).toFixed(1)}m`;
+  if (value < 60) {
+    return t('AGENT_PERFORMANCE.SECONDS', { value: Math.round(value) });
+  }
+  return t('AGENT_PERFORMANCE.MINUTES', {
+    value: (value / 60).toFixed(1),
+  });
 };
 
 const loadReport = async () => {
@@ -153,22 +162,32 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col w-full h-full overflow-auto">
+  <div dir="rtl" class="flex flex-col w-full h-full overflow-auto text-start">
     <ReportHeader
       :header-title="$t('AGENT_PERFORMANCE.HEADER')"
       :header-description="$t('AGENT_PERFORMANCE.DESCRIPTION')"
     />
 
     <div class="flex flex-wrap gap-3 mb-5">
-      <select
-        v-model="selectedAgentId"
-        class="h-10 px-3 rounded-lg bg-n-alpha-2 text-n-slate-12 outline outline-1 outline-n-weak"
-      >
-        <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-          {{ agent.name }}
-        </option>
-      </select>
-      <Input v-model="selectedDate" type="date" class="max-w-48" />
+      <label class="flex flex-col gap-1 text-label-small text-n-slate-11">
+        {{ $t('AGENT_PERFORMANCE.AGENT') }}
+        <select
+          v-model="selectedAgentId"
+          class="h-10 px-3 rounded-lg bg-n-alpha-2 text-n-slate-12 outline outline-1 outline-n-weak"
+          :aria-label="$t('AGENT_PERFORMANCE.SELECT_AGENT')"
+        >
+          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+            {{ agent.name }}
+          </option>
+        </select>
+      </label>
+      <Input
+        v-model="selectedDate"
+        type="date"
+        dir="ltr"
+        class="max-w-48"
+        :label="$t('AGENT_PERFORMANCE.DATE')"
+      />
       <span class="self-center text-body-small text-n-slate-11">
         {{ $t('AGENT_PERFORMANCE.DATA_UPDATED', { time: freshnessTime }) }}
       </span>
@@ -219,6 +238,7 @@ onMounted(async () => {
           :target="report.targets.replied_conversations"
         />
         <TargetCard
+          v-tooltip="$t('AGENT_PERFORMANCE.TOOLTIPS.SLA')"
           :label="$t('AGENT_PERFORMANCE.SLA')"
           :target="report.targets.response_sla"
           suffix="%"
@@ -235,14 +255,20 @@ onMounted(async () => {
           :value="report.messages.manual_template"
         />
         <PerformanceMetricCard
+          :label="$t('AGENT_PERFORMANCE.TOTAL_MESSAGES')"
+          :value="report.messages.total_customer_facing"
+        />
+        <PerformanceMetricCard
           :label="$t('AGENT_PERFORMANCE.AVERAGE')"
           :value="formatSeconds(report.response_times.average_seconds)"
         />
         <PerformanceMetricCard
+          v-tooltip="$t('AGENT_PERFORMANCE.TOOLTIPS.MEDIAN')"
           :label="$t('AGENT_PERFORMANCE.MEDIAN')"
           :value="formatSeconds(report.response_times.median_seconds)"
         />
         <PerformanceMetricCard
+          v-tooltip="$t('AGENT_PERFORMANCE.TOOLTIPS.P90')"
           :label="$t('AGENT_PERFORMANCE.P90')"
           :value="formatSeconds(report.response_times.p90_seconds)"
         />
@@ -251,6 +277,14 @@ onMounted(async () => {
           :value="
             formatSeconds(report.response_times.first_response_average_seconds)
           "
+        />
+        <PerformanceMetricCard
+          :label="$t('AGENT_PERFORMANCE.FASTEST_RESPONSE')"
+          :value="formatSeconds(report.response_times.fastest_seconds)"
+        />
+        <PerformanceMetricCard
+          :label="$t('AGENT_PERFORMANCE.SLOWEST_RESPONSE')"
+          :value="formatSeconds(report.response_times.slowest_seconds)"
         />
         <PerformanceMetricCard
           :label="$t('AGENT_PERFORMANCE.ELIGIBLE')"
@@ -286,9 +320,9 @@ onMounted(async () => {
                 :key="row.hour"
                 class="border-t border-n-weak"
               >
-                <td class="p-2">
+                <td dir="ltr" class="p-2 text-start">
                   {{
-                    new Date(row.hour).toLocaleTimeString([], {
+                    new Date(row.hour).toLocaleTimeString(locale, {
                       hour: '2-digit',
                       minute: '2-digit',
                     })
