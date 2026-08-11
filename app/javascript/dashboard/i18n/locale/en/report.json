@@ -656,6 +656,60 @@
       "VIEW_DETAILS": "View Details"
     }
   },
+  "AGENT_PERFORMANCE": {
+    "HEADER": "Agent performance",
+    "DESCRIPTION": "Auditable daily message, response, SLA, and target metrics.",
+    "DATA_UPDATED": "Data updated: {time}",
+    "DATA_DELAYED": "Analytics data is delayed.",
+    "TRACKING_START": "Reliable response-performance tracking starts from: {time}",
+    "TRACKING_START_EXPLANATION": "Messages and replied conversations may include reliably attributed historical data. SLA, average, median, P90, and first response use only eligible response samples with trustworthy assignment history.",
+    "TRACKING_START_MISSING": "Payroll tracking start date is not configured.",
+    "LOAD_ERROR": "Unable to load agent performance data.",
+    "TARGET": "Target",
+    "ACTUAL": "Actual",
+    "DIFFERENCE": "Difference",
+    "ACHIEVEMENT": "Achievement %",
+    "MESSAGES": "Customer-facing messages",
+    "REPLIED": "Replied conversations",
+    "SLA": "Response SLA",
+    "MANUAL": "Manual messages",
+    "TEMPLATES": "Manual template messages",
+    "AVERAGE": "Average response",
+    "MEDIAN": "Median response",
+    "P90": "P90 response",
+    "FIRST_RESPONSE": "First response",
+    "ELIGIBLE": "Eligible responses",
+    "EXCLUDED": "Excluded responses",
+    "HOURLY": "Messages by hour",
+    "HOUR": "Hour",
+    "DISTRIBUTION": "Response distribution",
+    "EXCLUSIONS": "Excluded response reasons",
+    "BUCKETS": {
+      "bucket_under_1m": "Under 1 minute",
+      "bucket_1_to_3m": "1–3 minutes",
+      "bucket_3_to_5m": "3–5 minutes",
+      "bucket_5_to_10m": "5–10 minutes",
+      "bucket_10_to_30m": "10–30 minutes",
+      "bucket_30m_plus": "30 minutes or more"
+    },
+    "EXCLUSION_REASONS": {
+      "assignment_history_missing": "Assignment history missing",
+      "unassigned_responder": "Unassigned responder",
+      "invalid_waiting_episode": "Invalid waiting episode"
+    },
+    "CONFIGURE_TARGETS": "Configure daily targets",
+    "SLA_PERCENT": "SLA target %",
+    "SLA_THRESHOLD": "SLA threshold (seconds)",
+    "SAVE_TARGETS": "Save targets",
+    "TARGETS_SAVED": "Targets saved.",
+    "TARGETS_ERROR": "Unable to save targets.",
+    "STATUS": {
+      "target_achieved": "Target achieved",
+      "below_target": "Below target",
+      "not_configured": "Not configured",
+      "no_eligible_responses": "No eligible responses"
+    }
+  },
   "SUMMARY_REPORTS": {
     "INBOX": "Inbox",
     "AGENT": "Agent",

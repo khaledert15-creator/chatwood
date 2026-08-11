@@ -74,3 +74,18 @@ remove_orphan_conversations_job:
   cron: '0 */12 * * *'
   class: 'Internal::RemoveOrphanConversationsJob'
   queue: housekeeping
+
+agent_performance_collect_messages_job:
+  cron: '*/2 * * * *'
+  class: 'AgentPerformance::CollectMessagesJob'
+  queue: analytics
+
+agent_performance_reconcile_job:
+  cron: '15 */6 * * *'
+  class: 'AgentPerformance::ReconcileJob'
+  queue: analytics
+
+agent_performance_build_rollups_job:
+  cron: '5 * * * *'
+  class: 'AgentPerformance::BuildRollupsJob'
+  queue: analytics

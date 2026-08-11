@@ -261,3 +261,7 @@
   display_name: API and Webhooks
   enabled: true
   column: feature_flags_ext_1
+- name: agent_performance_analytics
+  display_name: Agent Performance Analytics
+  enabled: false
+  column: feature_flags_ext_1

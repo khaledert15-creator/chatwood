@@ -31,6 +31,8 @@
   - active_storage_analysis
   - active_storage_purge
   - action_mailbox_incineration
+  # Reporting work is intentionally last so it never competes with messaging queues.
+  - analytics
 
 # you can override concurrency based on environment
 production:

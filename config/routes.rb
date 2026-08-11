@@ -250,6 +250,11 @@ Rails.application.routes.draw do
           end
           resources :reporting_events, only: [:index] if ChatwootApp.enterprise?
 
+          namespace :agent_performance do
+            resource :daily, only: [:show], controller: 'daily'
+            resources :targets, only: [:index, :create, :update]
+          end
+
           if ChatwootApp.enterprise?
             resources :calls, only: [:index]
             resources :whatsapp_calls, only: [:show] do

@@ -23,6 +23,7 @@ import CsatResponses from './CsatResponses.vue';
 import BotReports from './BotReports.vue';
 import LiveReports from './LiveReports.vue';
 import SLAReports from './SLAReports.vue';
+import AgentPerformance from './agentPerformance/AgentPerformance.vue';
 
 const meta = {
   featureFlag: FEATURE_FLAGS.REPORTS,
@@ -150,6 +151,15 @@ export default {
         },
         ...oldReportRoutes,
         ...revisedReportRoutes,
+        {
+          path: 'agent-performance',
+          name: 'agent_performance_reports',
+          meta: {
+            featureFlag: FEATURE_FLAGS.AGENT_PERFORMANCE_ANALYTICS,
+            permissions: ['administrator', 'report_manage'],
+          },
+          component: AgentPerformance,
+        },
         {
           path: 'sla',
           name: 'sla_reports',
