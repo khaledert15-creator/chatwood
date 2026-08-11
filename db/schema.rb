@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_10_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_11_090600) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -114,6 +114,37 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_10_000000) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "agent_analytics_cursors", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.string "collector", null: false
+    t.integer "last_source_id"
+    t.datetime "last_source_timestamp"
+    t.datetime "last_successful_run_at"
+    t.datetime "last_reconciled_at"
+    t.datetime "last_error_at"
+    t.string "last_error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "collector"], name: "index_agent_analytics_cursors_on_account_id_and_collector", unique: true
+  end
+
+  create_table "agent_assignment_intervals", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.integer "conversation_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "started_at", null: false
+    t.datetime "ended_at"
+    t.string "source_event_id", null: false
+    t.string "end_source_event_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "conversation_id", "started_at"], name: "index_agent_assignment_intervals_conversation_time"
+    t.index ["account_id", "conversation_id"], name: "index_agent_assignment_intervals_open", unique: true, where: "(ended_at IS NULL)"
+    t.index ["account_id", "user_id", "started_at"], name: "index_agent_assignment_intervals_agent_time"
+    t.index ["end_source_event_id"], name: "index_agent_assignment_intervals_on_end_source_event_id", unique: true
+    t.index ["source_event_id"], name: "index_agent_assignment_intervals_on_source_event_id", unique: true
+  end
+
   create_table "agent_bot_inboxes", force: :cascade do |t|
     t.integer "inbox_id"
     t.integer "agent_bot_id"
@@ -144,6 +175,122 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_10_000000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_agent_capacity_policies_on_account_id"
+  end
+
+  create_table "agent_message_facts", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "conversation_id", null: false
+    t.integer "inbox_id", null: false
+    t.bigint "contact_id"
+    t.integer "source_message_id", null: false
+    t.string "message_kind", null: false
+    t.datetime "sent_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "conversation_id", "sent_at"], name: "index_agent_message_facts_conversation_time"
+    t.index ["account_id", "inbox_id", "sent_at"], name: "index_agent_message_facts_inbox_time"
+    t.index ["account_id", "user_id", "sent_at"], name: "index_agent_message_facts_agent_time"
+    t.index ["source_message_id"], name: "index_agent_message_facts_on_source_message_id", unique: true
+  end
+
+  create_table "agent_performance_daily_rollups", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.bigint "user_id", null: false
+    t.date "date", null: false
+    t.integer "manual_messages_count", default: 0, null: false
+    t.integer "manual_template_messages_count", default: 0, null: false
+    t.integer "total_customer_facing_messages_count", default: 0, null: false
+    t.integer "replied_conversations_count", default: 0, null: false
+    t.integer "response_samples_count", default: 0, null: false
+    t.bigint "response_time_sum_seconds", default: 0, null: false
+    t.float "response_time_average_seconds"
+    t.float "response_time_median_seconds"
+    t.float "response_time_p90_seconds"
+    t.integer "response_time_fastest_seconds"
+    t.integer "response_time_slowest_seconds"
+    t.integer "first_response_samples_count", default: 0, null: false
+    t.float "first_response_time_average_seconds"
+    t.integer "sla_eligible_count", default: 0, null: false
+    t.integer "sla_met_count", default: 0, null: false
+    t.integer "excluded_responses_count", default: 0, null: false
+    t.integer "excluded_assignment_history_missing_count", default: 0, null: false
+    t.integer "excluded_unassigned_responder_count", default: 0, null: false
+    t.integer "excluded_invalid_waiting_episode_count", default: 0, null: false
+    t.integer "sla_threshold_seconds"
+    t.integer "bucket_under_1m", default: 0, null: false
+    t.integer "bucket_1_to_3m", default: 0, null: false
+    t.integer "bucket_3_to_5m", default: 0, null: false
+    t.integer "bucket_5_to_10m", default: 0, null: false
+    t.integer "bucket_10_to_30m", default: 0, null: false
+    t.integer "bucket_30m_plus", default: 0, null: false
+    t.datetime "calculated_at", null: false
+    t.integer "source_high_watermark"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "date"], name: "index_agent_performance_daily_account_date"
+    t.index ["account_id", "user_id", "date"], name: "index_agent_performance_daily_unique", unique: true
+  end
+
+  create_table "agent_performance_hourly_rollups", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "hour", null: false
+    t.integer "manual_messages_count", default: 0, null: false
+    t.integer "manual_template_messages_count", default: 0, null: false
+    t.integer "total_customer_facing_messages_count", default: 0, null: false
+    t.integer "replied_conversations_count", default: 0, null: false
+    t.integer "response_samples_count", default: 0, null: false
+    t.bigint "response_time_sum_seconds", default: 0, null: false
+    t.float "response_time_average_seconds"
+    t.integer "sla_eligible_count", default: 0, null: false
+    t.integer "sla_met_count", default: 0, null: false
+    t.datetime "calculated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "hour"], name: "index_agent_performance_hourly_account_hour"
+    t.index ["account_id", "user_id", "hour"], name: "index_agent_performance_hourly_unique", unique: true
+  end
+
+  create_table "agent_performance_targets", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.bigint "user_id"
+    t.string "period_type", null: false
+    t.string "metric", null: false
+    t.decimal "target_value", precision: 12, scale: 2, null: false
+    t.integer "threshold_seconds"
+    t.string "comparison", default: "at_least", null: false
+    t.date "effective_from", null: false
+    t.date "effective_until"
+    t.bigint "created_by_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "period_type", "metric", "effective_from"], name: "index_agent_performance_targets_default_scope"
+    t.index ["account_id", "user_id", "period_type", "metric", "effective_from"], name: "index_agent_performance_targets_scope"
+  end
+
+  create_table "agent_response_samples", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "conversation_id", null: false
+    t.integer "inbox_id", null: false
+    t.integer "source_message_id", null: false
+    t.datetime "customer_wait_started_at"
+    t.datetime "responsibility_started_at"
+    t.datetime "responded_at", null: false
+    t.integer "customer_wait_seconds"
+    t.integer "accountable_wait_seconds"
+    t.boolean "first_response", default: false, null: false
+    t.boolean "sla_eligible", default: false, null: false
+    t.boolean "unassigned_responder", default: false, null: false
+    t.boolean "assignment_history_missing", default: false, null: false
+    t.string "exclusion_reason"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "conversation_id", "responded_at"], name: "index_agent_response_samples_conversation_time"
+    t.index ["account_id", "user_id", "responded_at"], name: "index_agent_response_samples_agent_time"
+    t.index ["account_id", "user_id", "sla_eligible", "responded_at"], name: "index_agent_response_samples_sla"
+    t.index ["source_message_id"], name: "index_agent_response_samples_on_source_message_id", unique: true
   end
 
   create_table "agent_sessions", force: :cascade do |t|

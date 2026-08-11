@@ -54,6 +54,7 @@ class Account < ApplicationRecord
   store_accessor :settings, :audio_transcriptions, :auto_resolve_label
   store_accessor :settings, :captain_models, :captain_features
   store_accessor :settings, :reporting_timezone
+  store_accessor :settings, :agent_performance_tracking_started_at
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :captain_auto_resolve_mode, :captain_false_promise_harness_enabled
   include AccountCaptainAutoResolve
@@ -61,6 +62,9 @@ class Account < ApplicationRecord
   has_many :account_users, dependent: :destroy_async
   has_many :agent_bot_inboxes, dependent: :destroy_async
   has_many :agent_bots, dependent: :destroy_async
+  has_many :agent_performance_message_facts, class_name: 'AgentPerformance::MessageFact', dependent: :destroy_async
+  has_many :agent_performance_response_samples, class_name: 'AgentPerformance::ResponseSample', dependent: :destroy_async
+  has_many :agent_performance_targets, class_name: 'AgentPerformance::Target', dependent: :destroy_async
   has_many :api_channels, dependent: :destroy_async, class_name: '::Channel::Api'
   has_many :articles, dependent: :destroy_async, class_name: '::Article'
   has_many :assignment_policies, dependent: :destroy_async
