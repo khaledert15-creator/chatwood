@@ -18,6 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  APPROVED_SOURCE_SHA: 83cfd28208471f7035b31ddef19199f7610ece04
   IMAGE_NAME: ghcr.io/khaledert15-creator/chatwood
   IMAGE_TAG: 4.15.1-agent-performance-83cfd282
 
@@ -33,11 +34,18 @@ jobs:
 
       - name: Verify source commit
         shell: bash
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           ACTUAL_SHA=$(git rev-parse HEAD)
-          echo "Requested SHA: ${{ inputs.source_ref }}"
+          echo "Requested SHA: ${REQUESTED_SOURCE_REF}"
           echo "Actual SHA: ${ACTUAL_SHA}"
-          if [ "${ACTUAL_SHA}" != "${{ inputs.source_ref }}" ]; then
+          if [ "${REQUESTED_SOURCE_REF}" != "${APPROVED_SOURCE_SHA}" ]; then
+            echo "::error::Requested source_ref is not approved for this image tag."
+            exit 1
+          fi
+          if [ "${ACTUAL_SHA}" != "${APPROVED_SOURCE_SHA}" ]; then
+            echo "::error::Checked-out HEAD does not match the approved source commit."
             exit 1
           fi
 
