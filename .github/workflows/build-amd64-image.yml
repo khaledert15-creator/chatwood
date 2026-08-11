@@ -6,7 +6,7 @@ on:
       source_ref:
         description: Git commit SHA to build
         required: true
-        default: 83cfd28208471f7035b31ddef19199f7610ece04
+        default: 92e5a9b9d82d244ef5e337fe6427017633d34469
         type: string
 
 permissions:
@@ -18,9 +18,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APPROVED_SOURCE_SHA: 83cfd28208471f7035b31ddef19199f7610ece04
+  APPROVED_SOURCE_SHA: 92e5a9b9d82d244ef5e337fe6427017633d34469
   IMAGE_NAME: ghcr.io/khaledert15-creator/chatwood
-  IMAGE_TAG: 4.15.1-agent-performance-83cfd282
+  IMAGE_TAG: 4.15.1-agent-performance-ar-92e5a9b9
 
 jobs:
   build:
