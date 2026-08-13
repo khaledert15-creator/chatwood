@@ -227,6 +227,81 @@ describe Whatsapp::Providers::WhatsappCloudService do
     end
   end
 
+  describe 'recipient addressing' do
+    let(:bsuid) { 'EG.2433044927224350' }
+    let(:template_info) do
+      {
+        name: 'test_template',
+        namespace: 'test_namespace',
+        lang_code: 'en_US',
+        parameters: [{ type: 'text', text: 'test' }]
+      }
+    end
+
+    it 'keeps numeric phone recipients in the to field' do
+      expect(service.recipient_params('201001234567')).to eq(to: '201001234567')
+    end
+
+    it 'recognizes the production BSUID and uses the recipient field' do
+      expect(RegexHelper::WHATSAPP_BSUID_REGEX).to match(bsuid)
+      expect(service.recipient_params(bsuid)).to eq(recipient_type: 'individual', recipient: bsuid)
+      expect(service.recipient_params(bsuid)).not_to have_key(:to)
+    end
+
+    it 'sends text messages to a BSUID via recipient instead of to' do
+      request = stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+                .with do |http_request|
+        body = JSON.parse(http_request.body)
+        body['recipient'] == bsuid && body['recipient_type'] == 'individual' && !body.key?('to') && body['type'] == 'text'
+      end
+                .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, message)).to eq 'message_id'
+      expect(request).to have_been_requested.once
+    end
+
+    it 'sends attachments to a BSUID via recipient instead of to' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      request = stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+                .with do |http_request|
+        body = JSON.parse(http_request.body)
+        body['recipient'] == bsuid && body['recipient_type'] == 'individual' && !body.key?('to') && body['type'] == 'image'
+      end
+                .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, message)).to eq 'message_id'
+      expect(request).to have_been_requested.once
+    end
+
+    it 'sends templates to a BSUID via recipient instead of to' do
+      request = stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+                .with do |http_request|
+        body = JSON.parse(http_request.body)
+        body['recipient'] == bsuid && body['recipient_type'] == 'individual' && !body.key?('to') && body['type'] == 'template'
+      end
+                .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_template(bsuid, template_info, message)).to eq 'message_id'
+      expect(request).to have_been_requested.once
+    end
+
+    it 'sends interactive messages to a BSUID via recipient instead of to' do
+      interactive_message = create(:message, message_type: :outgoing, content: 'test', inbox: whatsapp_channel.inbox,
+                                             content_type: 'input_select',
+                                             content_attributes: { items: [{ title: 'Burito', value: 'Burito' }] })
+      request = stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+                .with do |http_request|
+        body = JSON.parse(http_request.body)
+        body['recipient'] == bsuid && body['recipient_type'] == 'individual' && !body.key?('to') && body['type'] == 'interactive'
+      end
+                .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, interactive_message)).to eq 'message_id'
+      expect(request).to have_been_requested.once
+    end
+  end
+
   describe '#sync_templates' do
     context 'when called' do
       it 'updated the message templates' do

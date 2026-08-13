@@ -54,6 +54,14 @@ class Whatsapp::Providers::BaseService
     message.save!
   end
 
+  def recipient_params(identifier)
+    if identifier.to_s.match?(RegexHelper::WHATSAPP_BSUID_REGEX)
+      { recipient_type: 'individual', recipient: identifier }
+    else
+      { to: identifier }
+    end
+  end
+
   def create_buttons(items)
     buttons = []
     items.each do |item|
