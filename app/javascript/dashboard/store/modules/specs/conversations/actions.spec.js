@@ -121,141 +121,20 @@ describe('#actions', () => {
   });
 
   describe('#addConversation', () => {
-    it('doesnot send mutation if conversation is from a different inbox', () => {
-      const conversation = {
-        id: 1,
-        messages: [],
-        meta: { sender: { id: 1, name: 'john-doe' } },
-        inbox_id: 2,
-      };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'home' } },
-          dispatch,
-          state: { currentInbox: 1, appliedFilters: [] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([]);
-      expect(dispatch.mock.calls).toEqual([]);
-    });
-
-    it('doesnot send mutation if conversation filters are applied', () => {
+    it('routes the event through the filter-aware real-time sync', () => {
       const conversation = {
         id: 1,
         messages: [],
         meta: { sender: { id: 1, name: 'john-doe' } },
         inbox_id: 1,
       };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'home' } },
-          dispatch,
-          state: { currentInbox: 1, appliedFilters: [{ id: 'random-filter' }] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([]);
-      expect(dispatch.mock.calls).toEqual([]);
-    });
-
-    it('doesnot send mutation if the view is conversation mentions', () => {
-      const conversation = {
-        id: 1,
-        messages: [],
-        meta: { sender: { id: 1, name: 'john-doe' } },
-        inbox_id: 1,
-      };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'conversation_mentions' } },
-          dispatch,
-          state: { currentInbox: 1, appliedFilters: [{ id: 'random-filter' }] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([]);
-      expect(dispatch.mock.calls).toEqual([]);
-    });
-
-    it('doesnot send mutation if the view is conversation folders', () => {
-      const conversation = {
-        id: 1,
-        messages: [],
-        meta: { sender: { id: 1, name: 'john-doe' } },
-        inbox_id: 1,
-      };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'folder_conversations' } },
-          dispatch,
-          state: { currentInbox: 1, appliedFilters: [{ id: 'random-filter' }] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([]);
-      expect(dispatch.mock.calls).toEqual([]);
-    });
-
-    it('sends correct mutations', () => {
-      const conversation = {
-        id: 1,
-        messages: [],
-        meta: { sender: { id: 1, name: 'john-doe' } },
-        inbox_id: 1,
-      };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'home' } },
-          dispatch,
-          state: { currentInbox: 1, appliedFilters: [] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([
-        [types.ADD_CONVERSATION, conversation],
-      ]);
+      actions.addConversation({ dispatch }, conversation);
       expect(dispatch.mock.calls).toEqual([
         [
-          'contacts/setContact',
+          'syncRealtimeConversation',
           {
-            id: 1,
-            name: 'john-doe',
-          },
-        ],
-      ]);
-    });
-
-    it('sends correct mutations if inbox filter is not available', () => {
-      const conversation = {
-        id: 1,
-        messages: [],
-        meta: { sender: { id: 1, name: 'john-doe' } },
-        inbox_id: 1,
-      };
-      actions.addConversation(
-        {
-          commit,
-          rootState: { route: { name: 'home' } },
-          dispatch,
-          state: { appliedFilters: [] },
-        },
-        conversation
-      );
-      expect(commit.mock.calls).toEqual([
-        [types.ADD_CONVERSATION, conversation],
-      ]);
-      expect(dispatch.mock.calls).toEqual([
-        [
-          'contacts/setContact',
-          {
-            id: 1,
-            name: 'john-doe',
+            conversation,
+            source: 'conversation_created',
           },
         ],
       ]);
@@ -567,25 +446,11 @@ describe('#deleteMessage', () => {
 });
 
 describe('#addMentions', () => {
-  it('does not send mutations if the view is not mentions', () => {
-    actions.addMentions(
-      { commit, dispatch, rootState: { route: { name: 'home' } } },
-      { id: 1 }
-    );
-    expect(commit.mock.calls).toEqual([]);
-    expect(dispatch.mock.calls).toEqual([]);
-  });
-
-  it('send mutations if the view is mentions', () => {
-    actions.addMentions(
-      {
-        dispatch,
-        rootState: { route: { name: 'conversation_mentions' } },
-      },
-      { id: 1, meta: { sender: { id: 1 } } }
-    );
+  it('routes mention events through the filter-aware real-time sync', () => {
+    const conversation = { id: 1, meta: { sender: { id: 1 } } };
+    actions.addMentions({ dispatch }, conversation);
     expect(dispatch.mock.calls).toEqual([
-      ['updateConversation', { id: 1, meta: { sender: { id: 1 } } }],
+      ['syncRealtimeConversation', { conversation, source: 'mention' }],
     ]);
   });
 

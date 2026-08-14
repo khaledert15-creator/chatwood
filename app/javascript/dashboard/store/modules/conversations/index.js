@@ -1,7 +1,7 @@
 import types from '../../mutation-types';
 import getters, { getSelectedChatConversation } from './getters';
 import actions from './actions';
-import { findPendingMessageIndex } from './helpers';
+import { findPendingMessageIndex, sortComparator } from './helpers';
 import { MESSAGE_STATUS } from 'shared/constants/messages';
 import wootConstants from 'dashboard/constants/globals';
 import { BUS_EVENTS } from '../../../../shared/constants/busEvents';
@@ -27,6 +27,12 @@ const state = {
 
 const getConversationById = _state => conversationId => {
   return _state.allConversations.find(c => c.id === conversationId);
+};
+
+const sortConversations = _state => {
+  _state.allConversations.sort((a, b) =>
+    sortComparator(a, b, _state.chatSortFilter)
+  );
 };
 
 // mutations
@@ -128,6 +134,7 @@ export const mutations = {
     const [chat] = _state.allConversations.filter(c => c.id === conversationId);
     if (chat) {
       chat.last_activity_at = lastActivityAt;
+      sortConversations(_state);
     }
   },
   [types.ASSIGN_PRIORITY](_state, { priority, conversationId }) {
@@ -232,6 +239,7 @@ export const mutations = {
     const exists = _state.allConversations.some(c => c.id === conversation.id);
     if (!exists) {
       _state.allConversations.push(conversation);
+      sortConversations(_state);
     }
   },
 
@@ -258,6 +266,7 @@ export const mutations = {
       if (_state.selectedChatId === conversation.id) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
+      sortConversations(_state);
     } else {
       const { conversationType } = _state.conversationFilters || {};
       const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;

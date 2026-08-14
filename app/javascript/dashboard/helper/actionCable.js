@@ -43,6 +43,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'user:logout': this.onLogout,
       'page:reload': this.onReload,
       'assignee.changed': this.onAssigneeChanged,
+      'team.changed': this.onTeamChanged,
       'conversation.typing_on': this.onTypingOn,
       'conversation.typing_off': this.onTypingOff,
       'conversation.contact_changed': this.onConversationContactChange,
@@ -106,7 +107,21 @@ class ActionCableConnector extends BaseActionCableConnector {
   onAssigneeChanged = payload => {
     const { id } = payload;
     if (id) {
-      this.app.$store.dispatch('updateConversation', payload);
+      this.app.$store.dispatch('syncRealtimeConversation', {
+        conversation: payload,
+        source: 'assignee',
+      });
+    }
+    this.fetchConversationStats();
+  };
+
+  onTeamChanged = payload => {
+    const { id } = payload;
+    if (id) {
+      this.app.$store.dispatch('syncRealtimeConversation', {
+        conversation: payload,
+        source: 'team',
+      });
     }
     this.fetchConversationStats();
   };
@@ -117,7 +132,10 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onConversationRead = data => {
-    this.app.$store.dispatch('updateConversation', data);
+    this.app.$store.dispatch('syncRealtimeConversation', {
+      conversation: data,
+      source: 'conversation_read',
+    });
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -134,18 +152,28 @@ class ActionCableConnector extends BaseActionCableConnector {
       lastActivityAt,
       conversationId,
     });
+    this.app.$store.dispatch('hydrateConversationFromRealtime', {
+      conversationId,
+      message: data,
+    });
   };
 
   // eslint-disable-next-line class-methods-use-this
   onReload = () => window.location.reload();
 
   onStatusChange = data => {
-    this.app.$store.dispatch('updateConversation', data);
+    this.app.$store.dispatch('syncRealtimeConversation', {
+      conversation: data,
+      source: 'status',
+    });
     this.fetchConversationStats();
   };
 
   onConversationUpdated = data => {
-    this.app.$store.dispatch('updateConversation', data);
+    this.app.$store.dispatch('syncRealtimeConversation', {
+      conversation: data,
+      source: 'conversation_updated',
+    });
     this.fetchConversationStats();
   };
 

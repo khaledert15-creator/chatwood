@@ -14,6 +14,10 @@ vi.mock('dashboard/composables/useImpersonation', () => ({
   }),
 }));
 
+vi.mock('../AudioAlerts/DashboardAudioNotificationHelper', () => ({
+  default: { onNewMessage: vi.fn() },
+}));
+
 global.chatwootConfig = {
   websocketURL: 'wss://test.chatwoot.com',
 };
@@ -73,6 +77,54 @@ describe('ActionCableConnector - Copilot Tests', () => {
         'copilotMessages/upsert',
         copilotData
       );
+    });
+  });
+
+  describe('real-time conversation list event handlers', () => {
+    it('registers and handles team.changed with the full filter-aware sync', () => {
+      const conversation = { id: 4, account_id: 1, meta: { team: { id: 2 } } };
+
+      actionCable.onReceived({ event: 'team.changed', data: conversation });
+
+      expect(actionCable.events['team.changed']).toBe(
+        actionCable.onTeamChanged
+      );
+      expect(mockDispatch).toHaveBeenCalledWith('syncRealtimeConversation', {
+        conversation,
+        source: 'team',
+      });
+    });
+
+    it('hydrates a missing conversation from a message event without refetching the list', () => {
+      const message = {
+        id: 9,
+        account_id: 1,
+        conversation_id: 4,
+        conversation: { last_activity_at: 200 },
+      };
+
+      actionCable.onReceived({ event: 'message.created', data: message });
+
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'hydrateConversationFromRealtime',
+        { conversationId: 4, message }
+      );
+      expect(mockDispatch).not.toHaveBeenCalledWith('fetchAllConversations');
+    });
+
+    it.each([
+      ['assignee.changed', 'assignee'],
+      ['conversation.status_changed', 'status'],
+      ['conversation.updated', 'conversation_updated'],
+    ])('routes %s through the filter-aware sync', (event, source) => {
+      const conversation = { id: 4, account_id: 1 };
+
+      actionCable.onReceived({ event, data: conversation });
+
+      expect(mockDispatch).toHaveBeenCalledWith('syncRealtimeConversation', {
+        conversation,
+        source,
+      });
     });
   });
 

@@ -8,8 +8,9 @@ import {
   isOnMentionsView,
   isOnParticipatingView,
   isOnUnattendedView,
-  isOnFoldersView,
 } from './helpers/actionHelpers';
+import { applyPageFilters } from './helpers';
+import { matchesFilters } from './helpers/filterHelpers';
 import messageReadActions from './actions/messageReadActions';
 import messageTranslateActions from './actions/messageTranslateActions';
 import * as Sentry from '@sentry/vue';
@@ -18,6 +19,145 @@ import {
   handleVoiceCallUpdated,
   syncConversationCallVisibility,
 } from 'dashboard/helper/voice';
+import wootConstants from 'dashboard/constants/globals';
+
+const REALTIME_HYDRATION_RETRY_MS = 30000;
+const REALTIME_HYDRATION_BACKOFF_MAX_ENTRIES = 500;
+const realtimeHydrationRequests = new Map();
+const realtimeHydrationBackoff = new Map();
+
+const getConversationTypeFromRoute = rootState => {
+  const safeRootState = rootState?.route ? rootState : { route: { name: '' } };
+
+  if (isOnMentionsView(safeRootState)) {
+    return wootConstants.CONVERSATION_TYPE.MENTION;
+  }
+  if (isOnParticipatingView(safeRootState)) {
+    return wootConstants.CONVERSATION_TYPE.PARTICIPATING;
+  }
+  if (isOnUnattendedView(safeRootState)) {
+    return wootConstants.CONVERSATION_TYPE.UNATTENDED;
+  }
+  return undefined;
+};
+
+const matchesAssigneeScope = (conversation, assigneeType, currentUserId) => {
+  const assignee = conversation.meta?.assignee;
+
+  if (assigneeType === wootConstants.ASSIGNEE_TYPE.ME) {
+    return assignee?.id === currentUserId;
+  }
+  if (assigneeType === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    return !assignee;
+  }
+  return true;
+};
+
+const matchesConversationTypeScope = (
+  conversation,
+  conversationType,
+  source,
+  currentUserId
+) => {
+  if (conversationType === wootConstants.CONVERSATION_TYPE.MENTION) {
+    return source === 'mention';
+  }
+  if (conversationType === wootConstants.CONVERSATION_TYPE.PARTICIPATING) {
+    return (
+      source === 'participating' ||
+      (source === 'assignee' &&
+        conversation.meta?.assignee?.id === currentUserId)
+    );
+  }
+  return true;
+};
+
+const getFolderFilters = rootState =>
+  rootState?.customViews?.activeConversationFolder?.query?.payload;
+
+export const isConversationInCurrentListScope = ({
+  conversation,
+  state,
+  rootState,
+  rootGetters,
+  source,
+}) => {
+  const appliedFilters = state.appliedFilters || [];
+  const folderFilters = getFolderFilters(rootState);
+  const exactFilters = appliedFilters.length ? appliedFilters : folderFilters;
+
+  if (exactFilters?.length) {
+    return matchesFilters(conversation, exactFilters);
+  }
+
+  const filters = state.conversationFilters || {};
+  const pageFilters = {
+    ...filters,
+    inboxId: filters.inboxId ?? state.currentInbox,
+    status: filters.status ?? state.chatStatusFilter ?? 'all',
+  };
+  const conversationType =
+    pageFilters.conversationType || getConversationTypeFromRoute(rootState);
+  const currentUserId =
+    rootGetters?.getCurrentUser?.id ?? rootGetters?.getCurrentUserID;
+
+  return (
+    applyPageFilters(conversation, { ...pageFilters, conversationType }) &&
+    matchesAssigneeScope(
+      conversation,
+      pageFilters.assigneeType,
+      currentUserId
+    ) &&
+    matchesConversationTypeScope(
+      conversation,
+      conversationType,
+      source,
+      currentUserId
+    )
+  );
+};
+
+const getRealtimeScopeKey = ({ state, rootState, rootGetters }) =>
+  JSON.stringify({
+    accountId: rootGetters?.getCurrentAccountId,
+    currentUserId:
+      rootGetters?.getCurrentUser?.id ?? rootGetters?.getCurrentUserID,
+    routeName: rootState?.route?.name,
+    routeParams: rootState?.route?.params,
+    filters: state.conversationFilters,
+    appliedFilters: state.appliedFilters,
+    folder: rootState?.customViews?.activeConversationFolder,
+  });
+
+const getHydrationKey = (rootGetters, conversationId) =>
+  `${rootGetters?.getCurrentAccountId || 'account'}:${conversationId}`;
+
+const clearConversationHydrationBackoff = conversationId => {
+  const suffix = `:${conversationId}`;
+  [...realtimeHydrationBackoff.keys()]
+    .filter(key => key.endsWith(suffix))
+    .forEach(key => realtimeHydrationBackoff.delete(key));
+};
+
+const setConversationHydrationBackoff = scopeKey => {
+  const now = Date.now();
+  realtimeHydrationBackoff.forEach((expiresAt, key) => {
+    if (expiresAt <= now) realtimeHydrationBackoff.delete(key);
+  });
+  while (
+    realtimeHydrationBackoff.size >= REALTIME_HYDRATION_BACKOFF_MAX_ENTRIES
+  ) {
+    realtimeHydrationBackoff.delete(
+      realtimeHydrationBackoff.keys().next().value
+    );
+  }
+  realtimeHydrationBackoff.set(scopeKey, now + REALTIME_HYDRATION_RETRY_MS);
+};
+
+export const resetRealtimeConversationHydration = () => {
+  realtimeHydrationRequests.clear();
+  realtimeHydrationBackoff.clear();
+};
 
 export const hasMessageFailedWithExternalError = pendingMessage => {
   // This helper is used to check if the message has failed with an external error.
@@ -377,38 +517,133 @@ const actions = {
     }
   },
 
-  addConversation({ commit, state, dispatch, rootState }, conversation) {
-    const { currentInbox, appliedFilters } = state;
-    const {
-      inbox_id: inboxId,
-      meta: { sender },
-    } = conversation;
-    const hasAppliedFilters = !!appliedFilters.length;
-    const isMatchingInboxFilter =
-      !currentInbox || Number(currentInbox) === inboxId;
-    if (
-      !hasAppliedFilters &&
-      !isOnFoldersView(rootState) &&
-      !isOnMentionsView(rootState) &&
-      !isOnParticipatingView(rootState) &&
-      !isOnUnattendedView(rootState) &&
-      isMatchingInboxFilter
-    ) {
-      commit(types.ADD_CONVERSATION, conversation);
-      dispatch('contacts/setContact', sender);
-    }
+  addConversation({ dispatch }, conversation) {
+    return dispatch('syncRealtimeConversation', {
+      conversation,
+      source: 'conversation_created',
+    });
   },
 
-  addMentions({ dispatch, rootState }, conversation) {
-    if (isOnMentionsView(rootState)) {
-      dispatch('updateConversation', conversation);
-    }
+  addMentions({ dispatch }, conversation) {
+    return dispatch('syncRealtimeConversation', {
+      conversation,
+      source: 'mention',
+    });
   },
 
-  addUnattended({ dispatch, rootState }, conversation) {
-    if (isOnUnattendedView(rootState)) {
-      dispatch('updateConversation', conversation);
+  addUnattended({ dispatch }, conversation) {
+    return dispatch('syncRealtimeConversation', {
+      conversation,
+      source: 'conversation_updated',
+    });
+  },
+
+  syncRealtimeConversation(
+    { commit, state, dispatch, rootState, rootGetters },
+    { conversation, source = 'conversation_updated' }
+  ) {
+    if (!conversation?.id) return false;
+
+    clearConversationHydrationBackoff(conversation.id);
+    const existingConversation = state.allConversations.find(
+      item => item.id === conversation.id
+    );
+    const matchesCurrentScope = isConversationInCurrentListScope({
+      conversation,
+      state,
+      rootState,
+      rootGetters,
+      source,
+    });
+
+    if (!existingConversation && !matchesCurrentScope) return false;
+
+    commit(
+      existingConversation ? types.UPDATE_CONVERSATION : types.ADD_CONVERSATION,
+      conversation
+    );
+    syncConversationCallVisibility(conversation, rootGetters?.getCurrentUserID);
+
+    dispatch('conversationLabels/setConversationLabel', {
+      id: conversation.id,
+      data: conversation.labels,
+    });
+
+    const sender = conversation.meta?.sender;
+    if (sender) dispatch('contacts/setContact', sender);
+
+    return matchesCurrentScope;
+  },
+
+  hydrateConversationFromRealtime(
+    { state, dispatch, rootState, rootGetters },
+    { conversationId, message }
+  ) {
+    if (state.allConversations.some(item => item.id === conversationId)) {
+      return Promise.resolve(true);
     }
+
+    const requestKey = getHydrationKey(rootGetters, conversationId);
+    const scopeKey = `${getRealtimeScopeKey({
+      state,
+      rootState,
+      rootGetters,
+    })}:${conversationId}`;
+    const backoffUntil = realtimeHydrationBackoff.get(scopeKey);
+    if (backoffUntil && backoffUntil > Date.now()) {
+      return Promise.resolve(false);
+    }
+
+    const existingRequest = realtimeHydrationRequests.get(requestKey);
+    if (existingRequest) {
+      if (message?.id) existingRequest.messages.set(message.id, message);
+      return existingRequest.promise;
+    }
+
+    const request = {
+      messages: new Map(message?.id ? [[message.id, message]] : []),
+      promise: null,
+    };
+
+    request.promise = ConversationApi.show(conversationId)
+      .then(response =>
+        dispatch('syncRealtimeConversation', {
+          conversation: response.data,
+          source: 'message',
+        })
+      )
+      .then(isVisible => {
+        if (isVisible) {
+          request.messages.forEach(queuedMessage => {
+            dispatch('addMessage', queuedMessage);
+            dispatch('updateConversationLastActivity', {
+              conversationId,
+              lastActivityAt: queuedMessage.conversation?.last_activity_at,
+            });
+          });
+        } else {
+          const currentScopeKey = `${getRealtimeScopeKey({
+            state,
+            rootState,
+            rootGetters,
+          })}:${conversationId}`;
+          setConversationHydrationBackoff(currentScopeKey);
+        }
+        return isVisible;
+      })
+      .catch(() => {
+        const currentScopeKey = `${getRealtimeScopeKey({
+          state,
+          rootState,
+          rootGetters,
+        })}:${conversationId}`;
+        setConversationHydrationBackoff(currentScopeKey);
+        return false;
+      })
+      .finally(() => realtimeHydrationRequests.delete(requestKey));
+
+    realtimeHydrationRequests.set(requestKey, request);
+    return request.promise;
   },
 
   updateConversation({ commit, dispatch, rootGetters }, conversation) {
