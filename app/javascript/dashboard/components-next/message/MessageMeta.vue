@@ -32,8 +32,12 @@ const {
   contentAttributes,
 } = useMessageContext();
 
-const readableTime = computed(() =>
+const fullReadableTime = computed(() =>
   messageTimestamp(createdAt.value, 'LLL d, h:mm a')
+);
+
+const readableTime = computed(() =>
+  messageTimestamp(createdAt.value, 'h:mm a')
 );
 
 const showStatusIndicator = computed(() => {
@@ -132,9 +136,11 @@ const statusToShow = computed(() => {
 </script>
 
 <template>
-  <div class="text-xs flex items-center gap-1.5">
+  <div class="text-[11px] leading-none flex items-center gap-1">
     <div class="inline">
-      <time class="inline">{{ readableTime }}</time>
+      <time v-tooltip.top-start="fullReadableTime" class="inline">
+        {{ readableTime }}
+      </time>
     </div>
     <Icon v-if="isPrivate" icon="i-lucide-lock-keyhole" class="size-3" />
     <MessageStatus v-if="showStatusIndicator" :status="statusToShow" />
