@@ -56,10 +56,13 @@ class SmsGateBridge
   end
 
   def receive(payload)
-    source = "smsgate:#{payload.fetch('messageId')}"
-    return if @inbox.messages.exists?(source_id: source)
-
     sender = payload.fetch('sender').strip
+    received_at = Time.iso8601(payload.fetch('receivedAt'))
+    legacy_source = "smsgate:#{payload.fetch('messageId')}"
+    fingerprint = Digest::SHA256.hexdigest([sender, received_at.iso8601(3)].join("\0"))[0, 16]
+    source = "#{legacy_source}:#{fingerprint}"
+    return if @inbox.messages.exists?(source_id: [source, legacy_source])
+
     phone = TelephoneNumber.parse(sender, 'EG').international_number.gsub(/[^+0-9]/, '') if sender.match?(/\A[+\d\s()-]+\z/)
     phone = nil unless phone&.match?(/\A\+[1-9]\d{1,14}\z/)
     identity = "smsgate:#{phone || sender}:sim#{payload['simNumber']}"
@@ -76,7 +79,7 @@ class SmsGateBridge
                                                                                         'smsgate_sender' => phone || sender))
     conversation.messages.create!(account: @inbox.account, inbox: @inbox, sender: contact_inbox.contact,
                                   message_type: :incoming, content: payload.fetch('message'), source_id: source,
-                                  content_attributes: { external_created_at: payload.fetch('receivedAt') })
+                                  created_at: received_at, content_attributes: { external_created_at: received_at.iso8601 })
   end
 
   def fail_message(message, text)
