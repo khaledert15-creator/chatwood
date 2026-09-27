@@ -110,7 +110,7 @@ const copyConversationId = async () => {
 <template>
   <div
     ref="conversationHeader"
-    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 pt-3 pb-2 h-24 xl:h-12"
+    class="z-10 flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 pt-3 pb-2 h-24 xl:h-12 bg-n-surface-1 border-b border-n-weak shadow-sm"
   >
     <div
       class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-1"

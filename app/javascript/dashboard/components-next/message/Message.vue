@@ -532,12 +532,14 @@ provideMessageContext({
   <div
     v-if="shouldRenderMessage"
     :id="`message${props.id}`"
-    class="flex w-full mb-2 message-bubble-container"
+    class="flex w-full message-bubble-container"
     :data-message-id="props.id"
     :class="[
       flexOrientationClass,
       {
         'group-with-next': shouldGroupWithNext,
+        'mb-0.5': shouldGroupWithNext,
+        'mb-2': !shouldGroupWithNext,
         'bg-n-alpha-1': showBackgroundHighlight,
       },
     ]"
