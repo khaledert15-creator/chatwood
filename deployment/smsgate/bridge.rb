@@ -35,8 +35,16 @@ class SmsGateBridge
     return [403, {}, []] unless event.fetch('deviceId') == @device
 
     Rails.application.executor.wrap do
+      messages = case event.fetch('event')
+                 when 'sms:received'
+                   [event.fetch('payload')]
+                 when 'sms:batch:received'
+                   event.fetch('payload').fetch('messages')
+                 else
+                   []
+                 end
       # Inbox lock serializes duplicate device callbacks and contact creation.
-      @inbox.with_lock { receive(event) } if event.fetch('event') == 'sms:received'
+      @inbox.with_lock { messages.each { |payload| receive(payload) } }
     end
     puts "smsgate callback accepted event=#{event.fetch('event')}"
     [200, { 'content-type' => 'application/json' }, ['{"ok":true}']]
@@ -47,8 +55,7 @@ class SmsGateBridge
     [500, {}, []]
   end
 
-  def receive(event)
-    payload = event.fetch('payload')
+  def receive(payload)
     source = "smsgate:#{payload.fetch('messageId')}"
     return if @inbox.messages.exists?(source_id: source)
 
