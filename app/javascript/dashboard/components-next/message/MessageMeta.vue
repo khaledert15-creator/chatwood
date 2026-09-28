@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { messageTimestamp } from 'shared/helpers/timeHelper';
+import { dateFormat } from 'shared/helpers/timeHelper';
 
 import MessageStatus from './MessageStatus.vue';
 import Icon from 'next/icon/Icon.vue';
@@ -33,12 +33,11 @@ const {
 } = useMessageContext();
 
 const fullReadableTime = computed(() =>
-  messageTimestamp(createdAt.value, 'LLL d, h:mm a')
+  dateFormat(createdAt.value, 'dd/MM/yyyy, h:mm a')
 );
 
-const readableTime = computed(() =>
-  messageTimestamp(createdAt.value, 'h:mm a')
-);
+const readableDate = computed(() => dateFormat(createdAt.value, 'dd/MM/yyyy'));
+const readableTime = computed(() => dateFormat(createdAt.value, 'h:mm a'));
 
 const showStatusIndicator = computed(() => {
   if (isPrivate.value) return false;
@@ -136,17 +135,23 @@ const statusToShow = computed(() => {
 </script>
 
 <template>
-  <div
-    dir="ltr"
-    class="text-[11px] leading-none flex flex-nowrap items-center gap-1 whitespace-nowrap"
-  >
-    <div class="inline">
-      <time v-tooltip.top-start="fullReadableTime" class="inline tabular-nums">
-        {{ readableTime }}
-      </time>
-    </div>
-    <Icon v-if="isPrivate" icon="i-lucide-lock-keyhole" class="size-3" />
-    <MessageStatus v-if="showStatusIndicator" :status="statusToShow" />
+  <div dir="ltr" class="text-[11px] leading-4 flex items-end gap-1">
+    <time
+      v-tooltip.top-start="fullReadableTime"
+      class="flex flex-wrap justify-end gap-x-2 tabular-nums"
+    >
+      <span class="whitespace-nowrap">{{ readableDate }}</span>
+      <span class="whitespace-nowrap">{{ readableTime }}</span>
+    </time>
+    <Icon
+      v-if="isPrivate"
+      icon="i-lucide-lock-keyhole"
+      class="size-3 shrink-0 self-center"
+    />
+    <MessageStatus
+      v-if="showStatusIndicator"
+      :status="statusToShow"
+      class="shrink-0 self-center"
+    />
   </div>
 </template>
-`

@@ -255,8 +255,8 @@ const flexOrientationClass = computed(() => {
 
 const gridClass = computed(() => {
   const map = {
-    [ORIENTATION.LEFT]: 'grid grid-cols-1fr',
-    [ORIENTATION.RIGHT]: 'grid grid-cols-[1fr_24px]',
+    [ORIENTATION.LEFT]: 'grid grid-cols-[minmax(0,1fr)]',
+    [ORIENTATION.RIGHT]: 'grid grid-cols-[minmax(0,1fr)_24px]',
   };
 
   return map[orientation.value];
@@ -553,10 +553,9 @@ provideMessageContext({
         gridClass,
         {
           'gap-y-2': contentAttributes.externalError,
-          'w-full': variant === MESSAGE_VARIANTS.EMAIL,
         },
       ]"
-      class="gap-x-2"
+      class="w-full min-w-0 gap-x-2"
       :style="{
         gridTemplateAreas: gridTemplate,
       }"
