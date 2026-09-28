@@ -14,6 +14,13 @@ const {
 } = require('@radix-ui/colors');
 
 export const colors = {
+  chat: {
+    canvas: { DEFAULT: '#eeeae3', dark: '#19211f' },
+    incoming: { DEFAULT: '#faf8f4', dark: '#252e2b' },
+    outgoing: { DEFAULT: '#e0e8dc', dark: '#2d3c34' },
+    border: { DEFAULT: '#d4d7cf', dark: '#3c4841' },
+    muted: { DEFAULT: '#58635b', dark: '#aebbb0' },
+  },
   woot: {
     25: blue.blue2,
     50: blue.blue3,
