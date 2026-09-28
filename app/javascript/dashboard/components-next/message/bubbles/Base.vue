@@ -103,7 +103,7 @@ const replyToPreview = computed(() => {
     :class="[
       messageClass,
       {
-        'w-fit min-w-24 max-w-[88%] sm:max-w-[76%] xl:max-w-[68%]': ![
+        'w-fit min-w-0 max-w-[min(100%,36rem)]': ![
           MESSAGE_VARIANTS.EMAIL,
           MESSAGE_VARIANTS.ACTIVITY,
         ].includes(variant),
