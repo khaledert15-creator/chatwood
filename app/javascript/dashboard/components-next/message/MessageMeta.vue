@@ -137,10 +137,11 @@ const statusToShow = computed(() => {
 
 <template>
   <div
+    dir="ltr"
     class="text-[11px] leading-none flex flex-nowrap items-center gap-1 whitespace-nowrap"
   >
     <div class="inline">
-      <time v-tooltip.top-start="fullReadableTime" class="inline">
+      <time v-tooltip.top-start="fullReadableTime" class="inline tabular-nums">
         {{ readableTime }}
       </time>
     </div>
