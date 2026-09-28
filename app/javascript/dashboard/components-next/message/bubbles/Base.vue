@@ -99,11 +99,17 @@ const replyToPreview = computed(() => {
 
 <template>
   <div
-    class="text-sm min-w-0"
+    class="text-sm"
     :class="[
       messageClass,
       {
-        'max-w-[min(36rem,85%)]': variant !== MESSAGE_VARIANTS.EMAIL,
+        'w-fit min-w-24 max-w-lg': ![
+          MESSAGE_VARIANTS.EMAIL,
+          MESSAGE_VARIANTS.ACTIVITY,
+        ].includes(variant),
+        'min-w-0': [MESSAGE_VARIANTS.EMAIL, MESSAGE_VARIANTS.ACTIVITY].includes(
+          variant
+        ),
       },
     ]"
   >

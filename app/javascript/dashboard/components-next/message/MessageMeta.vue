@@ -136,7 +136,9 @@ const statusToShow = computed(() => {
 </script>
 
 <template>
-  <div class="text-[11px] leading-none flex items-center gap-1">
+  <div
+    class="text-[11px] leading-none flex flex-nowrap items-center gap-1 whitespace-nowrap"
+  >
     <div class="inline">
       <time v-tooltip.top-start="fullReadableTime" class="inline">
         {{ readableTime }}
