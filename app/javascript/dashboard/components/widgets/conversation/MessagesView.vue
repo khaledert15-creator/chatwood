@@ -528,7 +528,7 @@ export default {
       </template>
     </MessageList>
     <div
-      class="flex relative flex-col pt-1 border-t border-n-weak bg-n-slate-2 dark:bg-n-background"
+      class="flex relative flex-col pt-1 border-t border-chat-border dark:border-chat-border-dark bg-chat-canvas dark:bg-chat-canvas-dark"
     >
       <div
         v-if="isAnyoneTyping"

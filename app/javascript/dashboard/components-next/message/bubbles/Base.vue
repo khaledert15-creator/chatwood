@@ -21,16 +21,16 @@ const { t } = useI18n();
 
 const varaintBaseMap = {
   [MESSAGE_VARIANTS.AGENT]:
-    'bg-n-teal-3 text-n-teal-12 border border-n-teal-5 shadow-sm',
+    'bg-chat-outgoing dark:bg-chat-outgoing-dark text-n-slate-12 border border-chat-border dark:border-chat-border-dark',
   [MESSAGE_VARIANTS.PRIVATE]:
     'bg-n-solid-amber text-n-amber-12 [&_.prosemirror-mention-node]:font-semibold',
   [MESSAGE_VARIANTS.USER]:
-    'bg-n-background text-n-slate-12 border border-n-weak shadow-sm',
+    'bg-chat-incoming dark:bg-chat-incoming-dark text-n-slate-12 border border-chat-border dark:border-chat-border-dark',
   [MESSAGE_VARIANTS.ACTIVITY]: 'bg-n-alpha-1 text-n-slate-11 text-sm',
   [MESSAGE_VARIANTS.BOT]:
-    'bg-n-teal-3 text-n-teal-12 border border-n-teal-5 shadow-sm',
+    'bg-chat-outgoing dark:bg-chat-outgoing-dark text-n-slate-12 border border-chat-border dark:border-chat-border-dark',
   [MESSAGE_VARIANTS.TEMPLATE]:
-    'bg-n-teal-3 text-n-teal-12 border border-n-teal-5 shadow-sm',
+    'bg-chat-outgoing dark:bg-chat-outgoing-dark text-n-slate-12 border border-chat-border dark:border-chat-border-dark',
   [MESSAGE_VARIANTS.ERROR]: 'bg-n-ruby-4 text-n-ruby-12',
   [MESSAGE_VARIANTS.EMAIL]: 'w-full',
   [MESSAGE_VARIANTS.UNSUPPORTED]:
@@ -133,13 +133,7 @@ const replyToPreview = computed(() => {
         variant === MESSAGE_VARIANTS.EMAIL ? 'px-3 pb-3' : '',
         variant === MESSAGE_VARIANTS.PRIVATE
           ? 'text-n-amber-12/50'
-          : [
-                MESSAGE_VARIANTS.AGENT,
-                MESSAGE_VARIANTS.BOT,
-                MESSAGE_VARIANTS.TEMPLATE,
-              ].includes(variant)
-            ? 'text-n-teal-11'
-            : 'text-n-slate-11',
+          : 'text-chat-muted dark:text-chat-muted-dark',
       ]"
       class="mt-1"
     />

@@ -1253,7 +1253,17 @@ export default {
 
 <template>
   <ReplyBoxBanner :message="message" :is-on-private-note="isOnPrivateNote" />
-  <div ref="replyEditor" class="reply-box" :class="replyBoxClass">
+  <div
+    ref="replyEditor"
+    class="reply-box"
+    :class="[
+      replyBoxClass,
+      {
+        '!bg-chat-incoming dark:!bg-chat-incoming-dark !border-chat-border dark:!border-chat-border-dark':
+          !isOnPrivateNote,
+      },
+    ]"
+  >
     <ReplyTopPanel
       :mode="replyType"
       :conversation-id="conversationId"
