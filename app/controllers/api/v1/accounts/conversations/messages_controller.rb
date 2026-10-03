@@ -28,10 +28,13 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   def retry
     return if message.blank?
 
-    service = Messages::StatusUpdateService.new(message, 'sent')
-    service.perform
-    message.update!(content_attributes: {})
-    ::SendReplyJob.perform_later(message.id)
+    should_retry = message.with_lock do
+      next false unless message.failed?
+
+      # Failed provider attempts can already have an ID, which otherwise prevents another send.
+      message.update!(status: :sent, source_id: nil, content_attributes: message.content_attributes.except('external_error'))
+    end
+    ::SendReplyJob.perform_later(message.id) if should_retry
   rescue StandardError => e
     render_could_not_create_error(e.message)
   end
