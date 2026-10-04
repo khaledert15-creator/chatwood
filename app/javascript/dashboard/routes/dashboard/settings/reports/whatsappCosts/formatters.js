@@ -17,7 +17,6 @@ export const formatMoney = (value, currency, locale, digits = 4) => {
   if (number === null) return '—';
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currencyDisplay: 'narrowSymbol',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: digits,
