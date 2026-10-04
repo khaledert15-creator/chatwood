@@ -11,6 +11,11 @@ export const buildReportMenuItems = ({ t, accountScopedRoute }) => [
     to: accountScopedRoute('agent_performance_reports'),
   },
   {
+    name: 'Reports WhatsApp Costs',
+    label: t('WHATSAPP_COSTS.TITLE'),
+    to: accountScopedRoute('whatsapp_costs_reports'),
+  },
+  {
     name: 'Reports Label',
     label: t('SIDEBAR.REPORTS_LABEL'),
     to: accountScopedRoute('label_reports_index'),
