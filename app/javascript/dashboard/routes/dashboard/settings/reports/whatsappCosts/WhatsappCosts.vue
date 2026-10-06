@@ -4,10 +4,13 @@ import { useI18n } from 'vue-i18n';
 import WhatsappCostsAPI from 'dashboard/api/whatsappCosts';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 import PhoneCostCard from './PhoneCostCard.vue';
+import PaidMessages from './PaidMessages.vue';
 import { asNumber, convertCost, formatMoney, formatCount } from './formatters';
 
 const { t, locale } = useI18n();
+const { isAdmin } = useAdmin();
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const currentMonth = new Intl.DateTimeFormat('en-CA', {
   year: 'numeric',
@@ -20,6 +23,7 @@ const loading = ref(false);
 const loadError = ref(false);
 const manualRate = ref('');
 const taxPercent = ref(14);
+const showPaidMessages = ref(false);
 let controller;
 const numberLocale = computed(() => locale.value.replace('_', '-'));
 const rate = computed(() => {
@@ -273,7 +277,28 @@ onBeforeUnmount(() => controller?.abort());
         <p class="m-0 mt-4 text-xs leading-5 text-n-slate-11">
           {{ t('WHATSAPP_COSTS.ESTIMATE_NOTICE') }}
         </p>
+        <button
+          v-if="isAdmin"
+          type="button"
+          class="mt-4 inline-flex items-center gap-2 rounded-lg border border-n-weak px-3 py-2 text-sm text-n-blue-11 hover:bg-n-alpha-1"
+          :aria-expanded="showPaidMessages"
+          @click="showPaidMessages = !showPaidMessages"
+        >
+          <span class="i-lucide-list-filter size-4" aria-hidden="true" />
+          {{
+            showPaidMessages
+              ? t('WHATSAPP_COSTS.HIDE_PAID_MESSAGES')
+              : t('WHATSAPP_COSTS.SHOW_PAID_MESSAGES')
+          }}
+        </button>
       </section>
+      <PaidMessages
+        v-if="showPaidMessages"
+        :month="month"
+        :timezone="timezone"
+        :phones="report.phones"
+        :reported-paid-count="report.totals.paid_volume"
+      />
       <div class="grid gap-4 lg:grid-cols-2">
         <PhoneCostCard
           v-for="phone in report.phones"
