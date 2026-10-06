@@ -1,4 +1,6 @@
 class Whatsapp::CostReportService
+  attr_reader :start_at, :end_at
+
   FREE_TIER_START = Date.new(2026, 10, 1).freeze
   FREE_TIER_LIMIT = 1000
 

@@ -58,6 +58,7 @@ class Whatsapp::IncomingMessageBaseService
 
   def update_message_with_status(message, status)
     message.status = status[:status]
+    Whatsapp::StatusPricingService.new(message, status).perform if inbox.channel.provider == 'whatsapp_cloud'
     if status[:status] == 'failed' && status[:errors].present?
       error = status[:errors]&.first
       message.external_error = "#{error[:code]}: #{error[:title]}"
