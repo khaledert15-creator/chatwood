@@ -96,7 +96,8 @@ class ActionCableListener < BaseListener
 
     tokens = user_tokens(account, inbox_members)
 
-    broadcast(account, tokens, CONVERSATION_UNREAD_COUNT_CHANGED, {})
+    payload = event.data[:conversation]&.then { |c| { conversation: { id: c.display_id, unread_count: c.unread_incoming_messages.count } } } || {}
+    broadcast(account, tokens, CONVERSATION_UNREAD_COUNT_CHANGED, payload)
   end
 
   def conversation_typing_on(event)
@@ -206,8 +207,7 @@ class ActionCableListener < BaseListener
   end
 
   def contact_tokens(contact_inbox, message)
-    return [] if message.private?
-    return [] if message.activity?
+    return [] if message.private? || message.activity?
     return [] if contact_inbox.nil?
 
     contact_inbox_tokens(contact_inbox)

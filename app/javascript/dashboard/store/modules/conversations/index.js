@@ -285,6 +285,10 @@ export const mutations = {
       chat.unread_count = unreadCount;
     }
   },
+  [types.SET_CONVERSATION_UNREAD_COUNT](_state, { id, unread_count }) {
+    const chat = getConversationById(_state)(id);
+    if (chat) chat.unread_count = unread_count;
+  },
   [types.CHANGE_CHAT_STATUS_FILTER](_state, data) {
     _state.chatStatusFilter = data;
   },

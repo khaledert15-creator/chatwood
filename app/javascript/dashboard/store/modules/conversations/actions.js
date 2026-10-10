@@ -33,6 +33,16 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
 
 // actions
 const actions = {
+  syncUnreadConversation: ({ commit, state, dispatch }, conversation) => {
+    const loaded = state.allConversations.some(
+      item => item.id === conversation.id
+    );
+    if (loaded) {
+      commit(types.SET_CONVERSATION_UNREAD_COUNT, conversation);
+    } else if (conversation.unread_count > 0) {
+      dispatch('getConversation', conversation.id);
+    }
+  },
   getConversation: async ({ commit }, conversationId) => {
     try {
       const response = await ConversationApi.show(conversationId);

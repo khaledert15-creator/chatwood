@@ -272,7 +272,8 @@ describe ActionCableListener do
         a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
         'conversation.unread_count_changed',
         {
-          account_id: account.id
+          account_id: account.id,
+          conversation: { id: conversation.display_id, unread_count: 0 }
         }
       )
 
