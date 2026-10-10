@@ -76,6 +76,7 @@ const resolveAttributesModalRef = ref(null);
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
 const activeStatus = ref(wootConstants.STATUS_TYPE.OPEN);
 const activeSortBy = ref(wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC);
+const unreadOnly = ref(false);
 const showAdvancedFilters = ref(false);
 // chatsOnView is to store the chats that are currently visible on the screen,
 // which mirrors the conversationList.
@@ -167,6 +168,15 @@ const hasAppliedFiltersOrActiveFolders = computed(() => {
   return hasAppliedFilters.value || hasActiveFolders.value;
 });
 
+const showUnreadFilter = computed(
+  () =>
+    !hasAppliedFiltersOrActiveFolders.value &&
+    !props.conversationInbox &&
+    !props.teamId &&
+    !props.label &&
+    !props.conversationType
+);
+
 const currentUserDetails = computed(() => {
   const { id, name } = currentUser.value;
   return { id, name };
@@ -251,8 +261,13 @@ const conversationFilters = computed(() => {
   return {
     inboxId: props.conversationInbox ? props.conversationInbox : undefined,
     assigneeType: activeAssigneeTab.value,
-    status: activeStatus.value,
-    sortBy: activeSortBy.value,
+    status: unreadOnly.value
+      ? wootConstants.STATUS_TYPE.OPEN
+      : activeStatus.value,
+    sortBy: unreadOnly.value
+      ? wootConstants.SORT_BY_TYPE.UNREAD
+      : activeSortBy.value,
+    unreadOnly: unreadOnly.value,
     page: conversationListPagination.value,
     labels: props.label ? [props.label] : undefined,
     teamId: props.teamId || undefined,
@@ -349,7 +364,8 @@ const conversationList = computed(() => {
 
   if (
     !hasAppliedFiltersOrActiveFolders.value &&
-    activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
+    (unreadOnly.value ||
+      activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD)
   ) {
     localConversationList = sortByUnreadStatus(localConversationList);
   }
@@ -606,6 +622,12 @@ function loadMoreConversations() {
 
 function updateAssigneeTab(selectedTab) {
   if (activeAssigneeTab.value !== selectedTab) {
+    if (unreadOnly.value) {
+      unreadOnly.value = false;
+      activeAssigneeTab.value = selectedTab;
+      resetAndFetchData();
+      return;
+    }
     resetBulkActions();
     emitter.emit('clearSearchInput');
     activeAssigneeTab.value = selectedTab;
@@ -616,11 +638,19 @@ function updateAssigneeTab(selectedTab) {
 }
 
 function onBasicFilterChange(value, type) {
+  unreadOnly.value = false;
   if (type === 'status') {
     activeStatus.value = value;
   } else {
     activeSortBy.value = value;
   }
+  resetAndFetchData();
+}
+
+function toggleUnreadFilter() {
+  unreadOnly.value = !unreadOnly.value;
+  if (unreadOnly.value)
+    activeAssigneeTab.value = wootConstants.ASSIGNEE_TYPE.ALL;
   resetAndFetchData();
 }
 
@@ -850,22 +880,35 @@ provide('assignPriority', assignPriority);
 provide('isConversationSelected', isConversationSelected);
 provide('deleteConversation', handleDelete);
 
-watch(activeTeam, () => resetAndFetchData());
+watch(activeTeam, () => {
+  unreadOnly.value = false;
+  resetAndFetchData();
+});
 
 watch(
   computed(() => props.conversationInbox),
-  () => resetAndFetchData()
+  () => {
+    unreadOnly.value = false;
+    resetAndFetchData();
+  }
 );
 watch(
   computed(() => props.label),
-  () => resetAndFetchData()
+  () => {
+    unreadOnly.value = false;
+    resetAndFetchData();
+  }
 );
 watch(
   computed(() => props.conversationType),
-  () => resetAndFetchData()
+  () => {
+    unreadOnly.value = false;
+    resetAndFetchData();
+  }
 );
 
 watch(activeFolder, (newVal, oldVal) => {
+  unreadOnly.value = false;
   if (newVal !== oldVal) {
     store.dispatch('customViews/setActiveConversationFolder', newVal || null);
   }
@@ -896,7 +939,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :page-title="pageTitle"
       :has-applied-filters="hasAppliedFilters"
       :has-active-folders="hasActiveFolders"
-      :active-status="activeStatus"
+      :active-status="unreadOnly ? 'open' : activeStatus"
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"
       :is-list-loading="chatListLoading && !conversationList.length"
@@ -936,11 +979,29 @@ watch(conversationFilters, (newVal, oldVal) => {
       @chat-tab-change="updateAssigneeTab"
     />
 
+    <div v-if="showUnreadFilter" class="border-b border-n-weak px-4 py-2">
+      <button
+        type="button"
+        class="rounded-full px-3 py-1 text-sm font-medium transition-colors"
+        :class="
+          unreadOnly
+            ? 'bg-n-brand text-white'
+            : 'bg-n-alpha-1 text-n-slate-11 hover:bg-n-alpha-2'
+        "
+        :aria-pressed="unreadOnly"
+        @click="toggleUnreadFilter"
+      >
+        {{ $t('CHAT_LIST.UNREAD_ONLY') }}
+      </button>
+    </div>
+
     <p
       v-if="!chatListLoading && !conversationList.length"
       class="flex overflow-auto justify-center items-center p-4"
     >
-      {{ $t('CHAT_LIST.LIST.404') }}
+      {{
+        unreadOnly ? $t('CHAT_LIST.LIST.NO_UNREAD') : $t('CHAT_LIST.LIST.404')
+      }}
     </p>
     <ConversationBulkActions
       :conversations="selectedConversations"

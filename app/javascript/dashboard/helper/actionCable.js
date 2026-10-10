@@ -134,6 +134,12 @@ class ActionCableConnector extends BaseActionCableConnector {
       lastActivityAt,
       conversationId,
     });
+    if (data.message_type === 0 && data.conversation.unread_count > 0) {
+      this.app.$store.dispatch('syncUnreadConversation', {
+        id: conversationId,
+        unread_count: data.conversation.unread_count,
+      });
+    }
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -149,8 +155,11 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.fetchConversationStats();
   };
 
-  onConversationUnreadCountChanged = () => {
+  onConversationUnreadCountChanged = ({ conversation } = {}) => {
     this.refreshConversationUnreadCountsWithFilteredRetry();
+    if (conversation) {
+      this.app.$store.dispatch('syncUnreadConversation', conversation);
+    }
   };
 
   refreshConversationUnreadCountsWithFilteredRetry = () => {

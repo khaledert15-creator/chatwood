@@ -121,7 +121,6 @@ class ConversationFinder
       current_account
     ).perform
     filter_by_conversation_type if params[:conversation_type]
-    @conversations
   end
 
   def filter_by_assignee_type
@@ -160,6 +159,7 @@ class ConversationFinder
   end
 
   def filter_by_status
+    return @conversations = @conversations.open.with_unread_incoming_messages if params[:unread_only] == 'true'
     return if params[:status] == 'all'
 
     @conversations = @conversations.where(status: params[:status] || DEFAULT_STATUS)

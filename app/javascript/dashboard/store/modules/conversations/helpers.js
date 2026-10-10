@@ -36,7 +36,14 @@ export const filterByUnattended = (
 };
 
 export const applyPageFilters = (conversation, filters) => {
-  const { inboxId, status, labels = [], teamId, conversationType } = filters;
+  const {
+    inboxId,
+    status,
+    labels = [],
+    teamId,
+    conversationType,
+    unreadOnly,
+  } = filters;
   const {
     status: chatStatus,
     inbox_id: chatInboxId,
@@ -49,6 +56,7 @@ export const applyPageFilters = (conversation, filters) => {
   const { id: chatTeamId } = team;
 
   let shouldFilter = filterByStatus(chatStatus, status);
+  if (unreadOnly) shouldFilter = shouldFilter && conversation.unread_count > 0;
   shouldFilter = filterByInbox(shouldFilter, inboxId, chatInboxId);
   shouldFilter = filterByTeam(shouldFilter, teamId, chatTeamId);
   shouldFilter = filterByLabel(shouldFilter, labels, chatLabels);
