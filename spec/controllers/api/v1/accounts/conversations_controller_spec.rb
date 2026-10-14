@@ -894,7 +894,7 @@ RSpec.describe 'Conversations API', type: :request do
         notifier = instance_double(Conversations::UnreadCounts::Notifier)
         invalidator = instance_double(Conversations::UnreadCounts::FilteredCountInvalidator)
 
-        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation).and_return(notifier)
+        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation, force_notify: true).and_return(notifier)
         allow(Conversations::UnreadCounts::FilteredCountInvalidator).to receive(:new).with(account).and_return(invalidator)
         expect(notifier).to receive(:perform).ordered.and_return(true)
         expect(invalidator).to receive(:conversation_changed!).ordered.and_return(true)
@@ -1143,7 +1143,7 @@ RSpec.describe 'Conversations API', type: :request do
         notifier = instance_double(Conversations::UnreadCounts::Notifier)
         invalidator = instance_double(Conversations::UnreadCounts::FilteredCountInvalidator)
 
-        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation).and_return(notifier)
+        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation, force_notify: true).and_return(notifier)
         allow(Conversations::UnreadCounts::FilteredCountInvalidator).to receive(:new).with(account).and_return(invalidator)
         expect(notifier).to receive(:perform).ordered.and_return(true)
         expect(invalidator).to receive(:conversation_changed!).ordered.and_return(true)

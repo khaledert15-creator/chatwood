@@ -13,7 +13,7 @@ class Conversations::UnreadCounts::Listener < BaseListener
     return unless account.feature_enabled?('conversation_unread_counts') || account.feature_enabled?(filtered_count_feature_flag)
 
     conversation = message.conversation
-    refreshed = refresh(conversation) if message.incoming? && account.feature_enabled?('conversation_unread_counts')
+    refreshed = refresh(conversation, force_notify: true) if message.incoming? && account.feature_enabled?('conversation_unread_counts')
 
     invalidate_filtered_conversation(conversation)
 
@@ -78,8 +78,10 @@ class Conversations::UnreadCounts::Listener < BaseListener
     notify_filtered_count_change(conversation) unless refreshed
   end
 
-  def refresh(conversation, changed_attributes = nil)
-    ::Conversations::UnreadCounts::Notifier.new(conversation, changed_attributes: changed_attributes).perform
+  def refresh(conversation, changed_attributes = nil, force_notify: false)
+    options = { changed_attributes: changed_attributes }
+    options[:force_notify] = true if force_notify
+    ::Conversations::UnreadCounts::Notifier.new(conversation, **options).perform
   end
 
   def remove_deleted_conversation(account, conversation_data)

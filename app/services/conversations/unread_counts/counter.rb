@@ -2,9 +2,6 @@ class Conversations::UnreadCounts::Counter
   MANAGE_ALL_PERMISSION = 'conversation_manage'.freeze
   UNASSIGNED_PERMISSION = 'conversation_unassigned_manage'.freeze
   PARTICIPATING_PERMISSION = 'conversation_participating_manage'.freeze
-  BUILD_LOCK_TTL = 15.minutes.to_i
-  BUILD_WAIT_TIMEOUT = 30.seconds.to_i
-  BUILD_WAIT_INTERVAL = 0.1.seconds
 
   attr_reader :account, :user
 
@@ -16,142 +13,46 @@ class Conversations::UnreadCounts::Counter
   def perform
     return with_filtered_counts(empty_counts, build: false) if permission_mode == :none
 
-    ensure_base_cache!
-    ensure_assignment_cache! if assignment_mode?
-
-    inbox_counts = unread_inbox_counts
+    rows = unread_conversations.pluck(:inbox_id, :team_id, :cached_label_list)
+    inbox_counts = rows.map(&:first).tally.transform_keys(&:to_s)
+    team_ids = visible_team_ids
+    team_counts = rows.map(&:second).select { |team_id| team_ids.include?(team_id) }.tally.transform_keys(&:to_s)
 
     {
       all_count: inbox_counts.values.sum,
       inboxes: inbox_counts,
-      labels: unread_label_counts,
-      teams: unread_team_counts
+      labels: unread_label_counts(rows),
+      teams: team_counts
     }.then { |counts| with_filtered_counts(counts) }
   end
 
   private
 
+  def unread_label_counts(rows)
+    label_ids_by_title = account.labels.where(show_on_sidebar: true).pluck(:title, :id).to_h
+    label_ids = rows.flat_map do |_, _, label_list|
+      label_list.to_s.split(',').map(&:strip).uniq.filter_map { |title| label_ids_by_title[title] }
+    end
+    label_ids.tally.transform_keys(&:to_s)
+  end
+
+  def unread_conversations
+    conversations = account.conversations.open.with_unread_incoming_messages.where(inbox_id: visible_inbox_ids)
+
+    case permission_mode
+    when :unassigned_and_mine
+      conversations.where(assignee_id: [nil, user.id])
+    when :mine
+      conversations.where(assignee_id: user.id)
+    else
+      conversations
+    end
+  end
+
   def with_filtered_counts(counts, build: true)
     return counts unless account.feature_enabled?(::Conversations::UnreadCounts::FilteredCounter::FEATURE_FLAG)
 
     counts.merge(build ? filtered_counter.perform : ::Conversations::UnreadCounts::FilteredCounter.empty_counts)
-  end
-
-  def ensure_base_cache!
-    ensure_cache_ready!(
-      ready: -> { store.base_ready?(account.id) },
-      lock_key: base_build_lock_key
-    ) { ::Conversations::UnreadCounts::Builder.new(account).build_base! }
-  end
-
-  def ensure_assignment_cache!
-    ensure_cache_ready!(
-      ready: -> { store.assignment_ready?(account.id) },
-      lock_key: assignment_build_lock_key
-    ) { ::Conversations::UnreadCounts::Builder.new(account).build_assignment! }
-  end
-
-  def ensure_cache_ready!(ready:, lock_key:)
-    lock_manager = Redis::LockManager.new
-
-    loop do
-      return if ready.call
-
-      return if lock_manager.with_lock(lock_key, BUILD_LOCK_TTL) { yield unless ready.call }
-
-      wait_for_cache_ready(ready)
-    end
-  end
-
-  def wait_for_cache_ready(ready)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + BUILD_WAIT_TIMEOUT
-    sleep BUILD_WAIT_INTERVAL until ready.call || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-  end
-
-  def base_build_lock_key
-    format(Redis::Alfred::UNREAD_CONVERSATIONS_BASE_BUILD_LOCK, account_id: account.id)
-  end
-
-  def assignment_build_lock_key
-    format(Redis::Alfred::UNREAD_CONVERSATIONS_ASSIGNMENT_BUILD_LOCK, account_id: account.id)
-  end
-
-  def unread_inbox_counts
-    counts_for_grouped_keys(visible_inbox_ids.index_with { |inbox_id| inbox_keys_for_mode(inbox_id) })
-  end
-
-  def unread_label_counts
-    keys_by_id = Hash.new { |hash, key| hash[key] = [] }
-    sidebar_label_ids.each do |label_id|
-      visible_inbox_ids.each do |inbox_id|
-        keys_by_id[label_id].concat(label_inbox_keys_for_mode(label_id, inbox_id))
-      end
-    end
-
-    counts_for_grouped_keys(keys_by_id)
-  end
-
-  def unread_team_counts
-    keys_by_id = Hash.new { |hash, key| hash[key] = [] }
-    visible_team_ids.each do |team_id|
-      visible_inbox_ids.each do |inbox_id|
-        keys_by_id[team_id].concat(team_inbox_keys_for_mode(team_id, inbox_id))
-      end
-    end
-
-    counts_for_grouped_keys(keys_by_id)
-  end
-
-  def inbox_keys_for_mode(inbox_id)
-    case permission_mode
-    when :base
-      [store.inbox_key(account.id, inbox_id)]
-    when :unassigned_and_mine
-      [store.inbox_unassigned_key(account.id, inbox_id), store.inbox_assignee_key(account.id, inbox_id, user.id)]
-    when :mine
-      [store.inbox_assignee_key(account.id, inbox_id, user.id)]
-    end
-  end
-
-  def label_inbox_keys_for_mode(label_id, inbox_id)
-    case permission_mode
-    when :base
-      [store.label_inbox_key(account.id, label_id, inbox_id)]
-    when :unassigned_and_mine
-      [
-        store.label_inbox_unassigned_key(account.id, label_id, inbox_id),
-        store.label_inbox_assignee_key(account.id, label_id, inbox_id, user.id)
-      ]
-    when :mine
-      [store.label_inbox_assignee_key(account.id, label_id, inbox_id, user.id)]
-    end
-  end
-
-  def team_inbox_keys_for_mode(team_id, inbox_id)
-    case permission_mode
-    when :base
-      [store.team_inbox_key(account.id, team_id, inbox_id)]
-    when :unassigned_and_mine
-      [
-        store.team_inbox_unassigned_key(account.id, team_id, inbox_id),
-        store.team_inbox_assignee_key(account.id, team_id, inbox_id, user.id)
-      ]
-    when :mine
-      [store.team_inbox_assignee_key(account.id, team_id, inbox_id, user.id)]
-    end
-  end
-
-  def counts_for_grouped_keys(keys_by_id)
-    counts_by_key = store.counts_for_keys(keys_by_id.values.flatten)
-
-    keys_by_id.each_with_object({}) do |(id, keys), result|
-      count = keys.sum { |key| counts_by_key[key].to_i }
-      result[id.to_s] = count if count.positive?
-    end
-  end
-
-  def assignment_mode?
-    %i[unassigned_and_mine mine].include?(permission_mode)
   end
 
   def permission_mode
@@ -187,10 +88,6 @@ class Conversations::UnreadCounts::Counter
                            end
   end
 
-  def sidebar_label_ids
-    @sidebar_label_ids ||= account.labels.where(show_on_sidebar: true).pluck(:id)
-  end
-
   def visible_team_ids
     @visible_team_ids ||= if account_user&.administrator?
                             account.teams.pluck(:id)
@@ -201,10 +98,6 @@ class Conversations::UnreadCounts::Counter
 
   def empty_counts
     { all_count: 0, inboxes: {}, labels: {}, teams: {} }
-  end
-
-  def store
-    ::Conversations::UnreadCounts::Store
   end
 
   def filtered_counter

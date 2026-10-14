@@ -18,7 +18,7 @@ RSpec.describe Conversations::UnreadCounts::Listener do
 
     listener.message_created(event)
 
-    expect(Conversations::UnreadCounts::Notifier).to have_received(:new).with(conversation, changed_attributes: nil)
+    expect(Conversations::UnreadCounts::Notifier).to have_received(:new).with(conversation, changed_attributes: nil, force_notify: true)
     expect(notifier).to have_received(:perform)
   end
 
