@@ -20,39 +20,24 @@ RSpec.describe Conversations::UnreadCounts::Counter do
     store.clear_account!(account.id)
   end
 
-  it 'builds the base cache on demand' do
+  it 'counts unread conversations even when the Redis cache misses them' do
     create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], team: visible_team)
+    store.mark_base_ready!(account.id)
 
-    described_class.new(account: account, user: agent).perform
+    result = described_class.new(account: account, user: agent).perform
 
-    expect(store.base_ready?(account.id)).to be(true)
+    expect(result).to include(all_count: 1, inboxes: { visible_inbox.id.to_s => 1 })
   end
 
-  it 'uses a Redis lock while building the base cache on demand' do
-    lock_key = "UNREAD_CONVERSATIONS::V1::ACCOUNT::#{account.id}::BUILD_LOCK::BASE"
-    lock_manager = instance_double(Redis::LockManager)
-    allow(Redis::LockManager).to receive(:new).and_return(lock_manager)
-    allow(lock_manager).to receive(:with_lock).with(lock_key, described_class::BUILD_LOCK_TTL).and_yield.and_return(true)
+  it 'does not count read conversations left in the Redis cache' do
+    conversation = create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], team: visible_team)
+    Conversations::UnreadCounts::Builder.new(account).build_base!
+    conversation.update!(agent_last_seen_at: 1.minute.from_now)
 
-    create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], team: visible_team)
+    result = described_class.new(account: account, user: agent).perform
 
-    described_class.new(account: account, user: agent).perform
-
-    expect(lock_manager).to have_received(:with_lock).with(lock_key, described_class::BUILD_LOCK_TTL)
-  end
-
-  it 'waits instead of rebuilding when another process owns the base build lock' do
-    lock_manager = instance_double(Redis::LockManager, with_lock: false)
-    counter = described_class.new(account: account, user: agent)
-
-    allow(Redis::LockManager).to receive(:new).and_return(lock_manager)
-    allow(counter).to receive(:wait_for_cache_ready) { store.mark_base_ready!(account.id) }
-    expect(Conversations::UnreadCounts::Builder).not_to receive(:new)
-
-    counter.perform
-
-    expect(counter).to have_received(:wait_for_cache_ready)
-    expect(store.base_ready?(account.id)).to be(true)
+    expect(result).to include(all_count: 0, inboxes: {}, labels: {}, teams: {})
+    expect(store.counts_for_keys([store.inbox_key(account.id, visible_inbox.id)]).values).to eq([1])
   end
 
   it 'counts unread conversations only across inboxes visible to a normal agent' do

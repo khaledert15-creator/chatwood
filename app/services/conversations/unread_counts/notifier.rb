@@ -1,17 +1,18 @@
 class Conversations::UnreadCounts::Notifier
   include Events::Types
 
-  attr_reader :conversation, :changed_attributes
+  attr_reader :conversation, :changed_attributes, :force_notify
 
-  def initialize(conversation, changed_attributes: nil)
+  def initialize(conversation, changed_attributes: nil, force_notify: false)
     @conversation = conversation
     @changed_attributes = changed_attributes
+    @force_notify = force_notify
   end
 
   def perform
     return false unless conversation.account.feature_enabled?('conversation_unread_counts')
     return dispatch_unread_count_changed if ::Conversations::UnreadCounts::Refresher.new(conversation, changed_attributes: changed_attributes).perform
-    return false unless conversation.account.feature_enabled?(filtered_count_feature_flag)
+    return false unless force_notify || conversation.account.feature_enabled?(filtered_count_feature_flag)
 
     dispatch_unread_count_changed
   end

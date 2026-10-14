@@ -30,6 +30,16 @@ RSpec.describe Conversations::UnreadCounts::Notifier do
       expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
     end
 
+    it 'dispatches when a database change must be broadcast despite stale memberships' do
+      described_class.new(conversation, force_notify: true).perform
+
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+        'conversation.unread_count_changed',
+        kind_of(Time),
+        conversation: conversation
+      )
+    end
+
     it 'dispatches unread count changed event when filtered counts are enabled' do
       conversation.account.enable_features!(:unread_count_for_filters)
 
