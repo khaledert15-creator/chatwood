@@ -160,7 +160,7 @@ export default {
         {{ $t('CONVERSATION.DASHBOARD_APP_SIDE.SHOW_BESIDE') }}
       </button>
     </div>
-    <div v-show="!activeIndex" class="flex h-full min-h-0 m-0">
+    <div v-show="!activeTabApp" class="flex h-full min-h-0 m-0">
       <MessagesView
         v-if="currentChat.id"
         :inbox-id="inboxId"
