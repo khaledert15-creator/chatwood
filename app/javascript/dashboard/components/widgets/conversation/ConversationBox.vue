@@ -1,9 +1,13 @@
 <script>
 import { mapGetters } from 'vuex';
+import { useMediaQuery } from '@vueuse/core';
+import { LocalStorage } from 'shared/helpers/localStorage';
 import ConversationHeader from './ConversationHeader.vue';
 import DashboardAppFrame from '../DashboardApp/Frame.vue';
 import EmptyState from './EmptyState/EmptyState.vue';
 import MessagesView from './MessagesView.vue';
+
+const SIDE_APP_STORAGE_KEY = 'chatwoot.dashboardApp.side';
 
 export default {
   components: {
@@ -31,14 +35,28 @@ export default {
       default: true,
     },
   },
+  setup() {
+    // A dashboard app pinned beside the messages needs room for both; narrower screens keep the tabs.
+    return { isWideScreen: useMediaQuery('(min-width: 1024px)') };
+  },
   data() {
-    return { activeIndex: 0 };
+    return {
+      activeIndex: 0,
+      sideAppId: LocalStorage.get(SIDE_APP_STORAGE_KEY),
+    };
   },
   computed: {
     ...mapGetters({
       currentChat: 'getSelectedChat',
       dashboardApps: 'dashboardApps/getRecords',
     }),
+    sideApp() {
+      if (!this.isWideScreen) return null;
+      return this.dashboardApps.find(app => app.id === this.sideAppId) || null;
+    },
+    tabApps() {
+      return this.dashboardApps.filter(app => app !== this.sideApp);
+    },
     dashboardAppTabs() {
       return [
         {
@@ -46,12 +64,15 @@ export default {
           index: 0,
           name: this.$t('CONVERSATION.DASHBOARD_APP_TAB_MESSAGES'),
         },
-        ...this.dashboardApps.map((dashboardApp, index) => ({
+        ...this.tabApps.map((dashboardApp, index) => ({
           key: `dashboard-${dashboardApp.id}`,
           index: index + 1,
           name: dashboardApp.title,
         })),
       ];
+    },
+    activeTabApp() {
+      return this.tabApps[this.activeIndex - 1] || null;
     },
     showContactPanel() {
       return this.isContactPanelOpen && this.currentChat.id;
@@ -88,6 +109,11 @@ export default {
     onDashboardAppTabChange(index) {
       this.activeIndex = index;
     },
+    setSideApp(app) {
+      this.sideAppId = app ? app.id : null;
+      LocalStorage.set(SIDE_APP_STORAGE_KEY, this.sideAppId);
+      this.activeIndex = 0;
+    },
   },
 };
 </script>
@@ -104,24 +130,36 @@ export default {
       :chat="currentChat"
       :show-back-button="isOnExpandedLayout && !isInboxView"
       :class="{
-        'border-b border-b-n-weak !pt-2': !dashboardApps.length,
+        'border-b border-b-n-weak !pt-2': !tabApps.length,
       }"
     />
-    <woot-tabs
-      v-if="dashboardApps.length && currentChat.id"
-      :index="activeIndex"
-      class="h-10"
-      @change="onDashboardAppTabChange"
+    <div
+      v-if="tabApps.length && currentChat.id"
+      class="flex items-center h-10 gap-2"
     >
-      <woot-tabs-item
-        v-for="tab in dashboardAppTabs"
-        :key="tab.key"
-        :index="tab.index"
-        :name="tab.name"
-        :show-badge="false"
-        is-compact
-      />
-    </woot-tabs>
+      <woot-tabs
+        :index="activeIndex"
+        class="h-10 flex-1 min-w-0"
+        @change="onDashboardAppTabChange"
+      >
+        <woot-tabs-item
+          v-for="tab in dashboardAppTabs"
+          :key="tab.key"
+          :index="tab.index"
+          :name="tab.name"
+          :show-badge="false"
+          is-compact
+        />
+      </woot-tabs>
+      <button
+        v-if="isWideScreen && activeTabApp"
+        type="button"
+        class="shrink-0 px-3 h-7 me-3 text-xs rounded-lg bg-n-alpha-2 text-n-slate-12 hover:bg-n-alpha-3"
+        @click="setSideApp(activeTabApp)"
+      >
+        {{ $t('CONVERSATION.DASHBOARD_APP_SIDE.SHOW_BESIDE') }}
+      </button>
+    </div>
     <div v-show="!activeIndex" class="flex h-full min-h-0 m-0">
       <MessagesView
         v-if="currentChat.id"
@@ -132,15 +170,42 @@ export default {
         v-if="!currentChat.id && !isInboxView"
         :is-on-expanded-layout="isOnExpandedLayout"
       />
+      <aside
+        v-if="sideApp && currentChat.id"
+        class="flex flex-col w-[400px] 2xl:w-[460px] shrink-0 min-h-0 border-s border-n-weak bg-n-surface-1"
+      >
+        <div
+          class="flex items-center justify-between h-10 px-3 border-b border-n-weak shrink-0"
+        >
+          <span class="text-sm font-medium text-n-slate-12 truncate">
+            {{ sideApp.title }}
+          </span>
+          <button
+            type="button"
+            class="px-2 h-7 text-xs rounded-lg text-n-slate-11 hover:bg-n-alpha-2"
+            @click="setSideApp(null)"
+          >
+            {{ $t('CONVERSATION.DASHBOARD_APP_SIDE.MOVE_TO_TAB') }}
+          </button>
+        </div>
+        <DashboardAppFrame
+          :key="currentChat.id + '-side-' + sideApp.id"
+          class="flex-1 min-h-0"
+          is-visible
+          :config="sideApp.content"
+          :position="dashboardApps.indexOf(sideApp)"
+          :current-chat="currentChat"
+        />
+      </aside>
       <slot />
     </div>
     <DashboardAppFrame
-      v-for="(dashboardApp, index) in dashboardApps"
+      v-for="(dashboardApp, index) in tabApps"
       v-show="activeIndex - 1 === index"
       :key="currentChat.id + '-' + dashboardApp.id"
       :is-visible="activeIndex - 1 === index"
-      :config="dashboardApps[index].content"
-      :position="index"
+      :config="dashboardApp.content"
+      :position="dashboardApps.indexOf(dashboardApp)"
       :current-chat="currentChat"
     />
   </div>

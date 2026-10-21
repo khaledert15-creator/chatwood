@@ -46,10 +46,14 @@ export default {
     },
   },
   watch: {
-    isVisible() {
-      if (this.isVisible) {
-        this.hasOpenedAtleastOnce = true;
-      }
+    // Immediate: an app pinned beside the messages is visible from the start.
+    isVisible: {
+      immediate: true,
+      handler() {
+        if (this.isVisible) {
+          this.hasOpenedAtleastOnce = true;
+        }
+      },
     },
   },
   mounted() {
@@ -98,6 +102,7 @@ export default {
         v-if="configItem.type === 'frame' && configItem.url"
         :id="getFrameId(index)"
         :src="configItem.url"
+        allow="clipboard-write"
         @load="() => onIframeLoad(index)"
       />
     </div>
