@@ -21,6 +21,7 @@
 #  otp_backup_codes       :text
 #  otp_required_for_login :boolean          default(FALSE)
 #  otp_secret             :string
+#  phone_number           :string
 #  provider               :string           default("email"), not null
 #  pubsub_token           :string
 #  remember_created_at    :datetime
@@ -40,6 +41,7 @@
 #  index_users_on_email                   (email)
 #  index_users_on_otp_required_for_login  (otp_required_for_login)
 #  index_users_on_otp_secret              (otp_secret) UNIQUE
+#  index_users_on_phone_number            (phone_number) UNIQUE
 #  index_users_on_pubsub_token            (pubsub_token) UNIQUE
 #  index_users_on_reset_password_token    (reset_password_token) UNIQUE
 #  index_users_on_uid_and_provider        (uid,provider) UNIQUE
@@ -76,7 +78,8 @@ class User < ApplicationRecord
   # validates_uniqueness_of :email, scope: :account_id
 
   validates :name, presence: true
-  validates :email, presence: true
+  validates :email, presence: true, unless: :phone_number?
+  validates :phone_number, uniqueness: true, format: { with: /\A\+?\d{6,15}\z/ }, allow_nil: true
 
   serialize :otp_backup_codes, type: Array
 
@@ -124,15 +127,25 @@ class User < ApplicationRecord
   scope :order_by_full_name, -> { order('lower(name) ASC') }
 
   before_validation do
-    self.email = email.try(:downcase)
+    self.email = email.presence&.downcase
+    self.phone_number = self.class.normalize_phone_number(phone_number)
   end
 
   def send_devise_notification(notification, *)
+    return if email.blank?
+
     devise_mailer.with(account: Current.account).send(notification, self, *).deliver_later
   end
 
+  # devise_token_auth skips password validation for non-email providers, but phone-only agents log in with a password
+  def password_required?
+    return super unless provider == 'phone'
+
+    !persisted? || !password.nil? || !password_confirmation.nil?
+  end
+
   def set_password_and_uid
-    self.uid = email
+    self.uid = email.presence || phone_number
   end
 
   def assigned_inboxes
@@ -172,6 +185,17 @@ class User < ApplicationRecord
 
   def self.from_email(email)
     find_by(email: email&.downcase)
+  end
+
+  def self.normalize_phone_number(phone_number)
+    phone_number.to_s.gsub(/[^\d+]/, '').presence
+  end
+
+  def self.from_login(login)
+    return from_email(login.strip) if login.to_s.include?('@')
+
+    phone_number = normalize_phone_number(login)
+    phone_number && find_by(phone_number: phone_number)
   end
 
   # 2FA/MFA Methods

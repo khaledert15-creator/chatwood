@@ -46,7 +46,7 @@ module UserAttributeHelpers
   # Used internally for Chatwoot in Chatwoot
   def hmac_identifier
     hmac_key = GlobalConfig.get('CHATWOOT_INBOX_HMAC_KEY')['CHATWOOT_INBOX_HMAC_KEY']
-    return OpenSSL::HMAC.hexdigest('sha256', hmac_key, email) if hmac_key.present?
+    return OpenSSL::HMAC.hexdigest('sha256', hmac_key, email || phone_number) if hmac_key.present?
 
     ''
   end

@@ -4,6 +4,8 @@ class Notification::EmailNotificationService
   def perform
     # don't send emails if user read the push notification already
     return if notification.read_at.present?
+    # agents registered with a mobile number only have no email to send to
+    return if notification.user.email.blank?
     # don't send emails if user is not confirmed
     return if notification.user.confirmed_at.nil?
     return unless user_subscribed_to_notification?

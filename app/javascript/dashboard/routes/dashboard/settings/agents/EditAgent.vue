@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useVuelidate } from '@vuelidate/core';
-import { required, minLength } from '@vuelidate/validators';
+import { required, minLength, helpers } from '@vuelidate/validators';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
@@ -19,6 +19,10 @@ const props = defineProps({
     required: true,
   },
   email: {
+    type: String,
+    default: '',
+  },
+  phoneNumber: {
     type: String,
     default: '',
   },
@@ -49,6 +53,11 @@ const { t } = useI18n();
 
 const agentName = ref(props.name);
 const agentAvailability = ref(props.availability);
+const agentPhoneNumber = ref(props.phoneNumber || '');
+const agentPassword = ref('');
+
+// agents without an email can't get a reset link, so the admin sets their password here
+const isPhoneOnly = computed(() => !props.email);
 const selectedRoleId = ref(props.customRoleId || props.type);
 const agentCredentials = ref({ email: props.email });
 
@@ -56,12 +65,16 @@ const rules = {
   agentName: { required, minLength: minLength(1) },
   selectedRoleId: { required },
   agentAvailability: { required },
+  agentPhoneNumber: { phoneNumber: helpers.regex(/^\+?[\d\s-]{6,20}$/) },
+  agentPassword: { minLength: minLength(6) },
 };
 
 const v$ = useVuelidate(rules, {
   agentName,
   selectedRoleId,
   agentAvailability,
+  agentPhoneNumber,
+  agentPassword,
 });
 
 const pageTitle = computed(
@@ -126,7 +139,11 @@ const editAgent = async () => {
       id: props.id,
       name: agentName.value,
       availability: agentAvailability.value,
+      phone_number: agentPhoneNumber.value,
     };
+    if (isPhoneOnly.value && agentPassword.value) {
+      payload.password = agentPassword.value;
+    }
 
     if (selectedRole.value.name.startsWith('custom_')) {
       payload.custom_role_id = selectedRole.value.id;
@@ -170,6 +187,35 @@ const resetPassword = async () => {
       </div>
 
       <div class="w-full">
+        <label :class="{ error: v$.agentPhoneNumber.$error }">
+          {{ $t('AGENT_MGMT.EDIT.FORM.PHONE_NUMBER.LABEL') }}
+          <input
+            v-model="agentPhoneNumber"
+            type="tel"
+            dir="ltr"
+            :placeholder="$t('AGENT_MGMT.EDIT.FORM.PHONE_NUMBER.PLACEHOLDER')"
+            @input="v$.agentPhoneNumber.$touch"
+          />
+          <span v-if="v$.agentPhoneNumber.$error" class="message">
+            {{ $t('AGENT_MGMT.EDIT.FORM.PHONE_NUMBER.ERROR') }}
+          </span>
+        </label>
+      </div>
+
+      <div v-if="isPhoneOnly" class="w-full">
+        <label :class="{ error: v$.agentPassword.$error }">
+          {{ $t('AGENT_MGMT.EDIT.FORM.PASSWORD.LABEL') }}
+          <input
+            v-model="agentPassword"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="$t('AGENT_MGMT.EDIT.FORM.PASSWORD.PLACEHOLDER')"
+            @input="v$.agentPassword.$touch"
+          />
+        </label>
+      </div>
+
+      <div class="w-full">
         <label :class="{ error: v$.selectedRoleId.$error }">
           {{ $t('AGENT_MGMT.EDIT.FORM.AGENT_TYPE.LABEL') }}
           <select v-model="selectedRoleId" @change="v$.selectedRoleId.$touch">
@@ -207,7 +253,7 @@ const resetPassword = async () => {
       <div class="flex flex-row justify-start w-full gap-2 px-0 py-2">
         <div class="w-[50%] ltr:text-left rtl:text-right">
           <Button
-            v-if="provider !== 'saml'"
+            v-if="provider !== 'saml' && !isPhoneOnly"
             ghost
             type="button"
             icon="i-lucide-lock-keyhole"

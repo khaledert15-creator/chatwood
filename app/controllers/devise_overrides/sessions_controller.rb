@@ -29,6 +29,13 @@ class DeviseOverrides::SessionsController < DeviseTokenAuth::SessionsController
 
   private
 
+  # The login field accepts either an email or a mobile number
+  def find_resource(field, value)
+    return super unless field == :email
+
+    @resource = User.from_login(value)
+  end
+
   def render_create_error_not_confirmed
     render_error(
       :unauthorized,
@@ -40,8 +47,7 @@ class DeviseOverrides::SessionsController < DeviseTokenAuth::SessionsController
   def find_user_for_authentication
     return nil unless params[:email].present? && params[:password].present?
 
-    normalized_email = params[:email].strip.downcase
-    user = User.from_email(normalized_email)
+    user = User.from_login(params[:email].strip.downcase)
     return nil unless user&.valid_password?(params[:password])
     return nil unless user.active_for_authentication?
 
