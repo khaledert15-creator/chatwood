@@ -33,9 +33,7 @@ const currentStatusFilter = computed(() => {
 });
 
 const currentSortBy = computed(() => {
-  return (
-    chatSortFilter.value || wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC
-  );
+  return chatSortFilter.value || wootConstants.SORT_BY_TYPE.WAITING_SINCE_ASC;
 });
 
 const chatStatusOptions = computed(() => [

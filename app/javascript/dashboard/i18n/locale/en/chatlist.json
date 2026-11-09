@@ -146,6 +146,12 @@
     "SHOW_QUOTED_TEXT": "Show Quoted Text",
     "MESSAGE_READ": "Read",
     "SENDING": "Sending",
-    "UNREAD_COUNT_OVERFLOW": "9+"
+    "UNREAD_COUNT_OVERFLOW": "9+",
+    "WAITING_BADGE": {
+      "MINUTES": "Waiting {minutes}m",
+      "HOURS": "Waiting {hours}h",
+      "DAYS": "Waiting {days}d",
+      "TOOLTIP": "The customer is waiting for a reply"
+    }
   }
 }
