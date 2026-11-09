@@ -31,6 +31,8 @@ const ERROR_MESSAGES = {
 const IMPERSONATION_URL_SEARCH_KEY = 'impersonation';
 const USER_NOT_CONFIRMED_ERROR_CODE = 'user_not_confirmed';
 
+const PHONE_NUMBER_REGEX = /^\+?[\d\s-]{6,20}$/;
+
 export default {
   components: {
     FormInput,
@@ -84,7 +86,8 @@ export default {
         },
         email: {
           required,
-          email,
+          emailOrPhone: value =>
+            email.$validator(value) || PHONE_NUMBER_REGEX.test(value),
         },
       },
     };

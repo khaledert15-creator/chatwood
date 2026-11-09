@@ -12,6 +12,8 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     builder = AgentBuilder.new(
       email: new_agent_params['email'],
       name: new_agent_params['name'],
+      phone_number: new_agent_params['phone_number'],
+      password: new_agent_params['password'],
       role: new_agent_params['role'],
       availability: new_agent_params['availability'],
       auto_offline: new_agent_params['auto_offline'],
@@ -23,7 +25,8 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @agent.update!(agent_params.slice(:name).compact)
+    update_phone_only_agent_password if agent_params[:password].present?
+    @agent.update!(agent_params.slice(:name, :phone_number).compact)
     @agent.current_account_user.update!(agent_params.slice(*account_user_attributes).compact)
   end
 
@@ -67,12 +70,20 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     @agent = agents.find(params[:id])
   end
 
+  # Agents without an email can't receive a reset link, so admins set their password directly.
+  # Limited to agents that belong only to this account so admins can't take over users of other accounts.
+  def update_phone_only_agent_password
+    raise Pundit::NotAuthorizedError if @agent.email.present? || @agent.account_users.count > 1
+
+    @agent.update!(password: agent_params[:password], password_confirmation: agent_params[:password])
+  end
+
   def account_user_attributes
     [:role, :availability, :auto_offline]
   end
 
   def allowed_agent_params
-    [:name, :email, :role, :availability, :auto_offline]
+    [:name, :email, :phone_number, :password, :role, :availability, :auto_offline]
   end
 
   def agent_params
@@ -80,7 +91,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def new_agent_params
-    params.require(:agent).permit(:email, :name, :role, :availability, :auto_offline)
+    params.require(:agent).permit(:email, :name, :phone_number, :password, :role, :availability, :auto_offline)
   end
 
   def agents

@@ -37,8 +37,18 @@
           "ERROR": "Role is required"
         },
         "EMAIL": {
-          "LABEL": "Email Address",
+          "LABEL": "Email Address (optional if a mobile number is added)",
           "PLACEHOLDER": "Please enter an email address of the agent"
+        },
+        "PHONE_NUMBER": {
+          "LABEL": "Mobile Number (optional)",
+          "PLACEHOLDER": "e.g. +201012345678",
+          "ERROR": "Please enter a valid mobile number"
+        },
+        "PASSWORD": {
+          "LABEL": "Password",
+          "PLACEHOLDER": "Set a password for the agent",
+          "HELP": "The agent has no email, so share this password with them to log in with their mobile number."
         },
         "SUBMIT": "Add Agent"
       },
@@ -76,6 +86,15 @@
         "EMAIL": {
           "LABEL": "Email Address",
           "PLACEHOLDER": "Please enter an email address of the agent"
+        },
+        "PHONE_NUMBER": {
+          "LABEL": "Mobile Number (optional)",
+          "PLACEHOLDER": "e.g. +201012345678",
+          "ERROR": "Please enter a valid mobile number"
+        },
+        "PASSWORD": {
+          "LABEL": "New password",
+          "PLACEHOLDER": "Leave empty to keep the current password"
         },
         "AGENT_AVAILABILITY": {
           "LABEL": "Availability",
