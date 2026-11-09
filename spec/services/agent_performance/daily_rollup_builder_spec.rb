@@ -20,11 +20,4 @@ RSpec.describe AgentPerformance::DailyRollupBuilder do
 
     expect(rollup).to have_attributes(sla_eligible_count: 3, sla_met_count: 2, response_time_median_seconds: 180.0)
   end
-
-  it 'keeps zero eligible responses distinct from zero percent compliance' do
-    described_class.new(account: account, user_id: agent.id, date: date).perform
-
-    report = AgentPerformance::DailyReportBuilder.new(account: account, user: agent, date: date).build
-    expect(report.dig(:response_sla, :compliance_percentage)).to be_nil
-  end
 end

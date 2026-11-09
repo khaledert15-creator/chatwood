@@ -2,114 +2,87 @@ import { shallowMount } from '@vue/test-utils';
 import { ref } from 'vue';
 import AgentPerformance from '../AgentPerformance.vue';
 
-const dispatch = vi.fn().mockResolvedValue();
-
-vi.mock('dashboard/composables/store', () => ({
-  useStore: () => ({
-    dispatch,
-    getters: { 'agents/getAgents': [] },
-  }),
+vi.mock('dashboard/api/agentPerformance', () => ({
+  default: { getDaily: vi.fn(() => new Promise(() => {})) },
 }));
 
 vi.mock('dashboard/composables', () => ({ useAlert: vi.fn() }));
 
+const translate = (key, params = {}) =>
+  Object.keys(params).length ? `${key} ${JSON.stringify(params)}` : key;
+
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key, params = {}) => (params.time ? `${key}: ${params.time}` : key),
-    locale: ref('ar'),
-  }),
+  useI18n: () => ({ t: translate, locale: ref('ar') }),
 }));
 
-const report = trackingStart => ({
-  analytics_tracking_started_at: trackingStart,
-  freshness: { delayed: true, data_fresh_as_of: '2026-08-11T10:10:00Z' },
-  messages: { manual: 10, manual_template: 1, total_customer_facing: 11 },
-  response_times: {
-    average_seconds: 60,
-    median_seconds: 55,
-    p90_seconds: 90,
-    first_response_average_seconds: 50,
-    fastest_seconds: 30,
-    slowest_seconds: 120,
-  },
-  response_eligibility: { eligible: 3, excluded: 2, exclusion_reasons: {} },
-  response_distribution: {},
-  targets: {
-    messages: { status: 'target_achieved' },
-    replied_conversations: { status: 'target_achieved' },
-    response_sla: { status: 'target_achieved' },
-  },
-  hourly: [],
-});
-
-const mountComponent = () =>
-  shallowMount(AgentPerformance, {
-    global: {
-      mocks: {
-        $t: (key, params = {}) =>
-          params.time ? `${key}: ${params.time}` : key,
-      },
+const report = {
+  late_reply_minutes: 10,
+  updated_at: '2026-08-11T10:10:00Z',
+  agents: [
+    {
+      id: 1,
+      name: 'Mona',
+      messages: 12,
+      conversations: 4,
+      replies: 3,
+      typical_reply_seconds: 30,
+      late_replies: 0,
+      targets: { messages: null, conversations: null },
     },
+    {
+      id: 2,
+      name: 'Ali',
+      messages: 40,
+      conversations: 9,
+      replies: 8,
+      typical_reply_seconds: 190,
+      late_replies: 2,
+      targets: { messages: 50, conversations: null },
+    },
+  ],
+};
+
+const mountComponent = async () => {
+  const wrapper = shallowMount(AgentPerformance, {
+    global: { mocks: { $t: translate } },
   });
+  wrapper.vm.loading = false;
+  wrapper.vm.report = report;
+  await wrapper.vm.$nextTick();
+  return wrapper;
+};
 
 describe('AgentPerformance', () => {
-  it('shows the payroll tracking start and preserves report indicators', async () => {
-    const wrapper = mountComponent();
-    wrapper.vm.report = report('2026-08-11T10:00:00Z');
-    await wrapper.vm.$nextTick();
+  it('lists agents with the most messages first in plain words', async () => {
+    const wrapper = await mountComponent();
+    const rows = wrapper.findAll('[data-testid="agents-table"] tbody tr');
 
-    expect(
-      wrapper.find('[data-testid="tracking-start-notice"]').text()
-    ).toContain('AGENT_PERFORMANCE.TRACKING_START');
-    expect(
-      wrapper.find('[data-testid="tracking-start-warning"]').exists()
-    ).toBe(false);
-    expect(wrapper.findAllComponents({ name: 'TargetCard' })).toHaveLength(3);
-    expect(
-      wrapper
-        .findAllComponents({ name: 'PerformanceMetricCard' })
-        .map(card => card.props('label'))
-    ).toEqual(
-      expect.arrayContaining([
-        'AGENT_PERFORMANCE.AVERAGE',
-        'AGENT_PERFORMANCE.MEDIAN',
-        'AGENT_PERFORMANCE.P90',
-        'AGENT_PERFORMANCE.ELIGIBLE',
-        'AGENT_PERFORMANCE.EXCLUDED',
-      ])
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain('Ali');
+    expect(rows[0].text()).toContain('AGENT_PERFORMANCE.MINUTES {"value":3}');
+    expect(rows[0].text()).toContain(
+      'AGENT_PERFORMANCE.LATE_OF_REPLIES {"late":2,"replies":8}'
     );
-    expect(wrapper.text()).toContain('AGENT_PERFORMANCE.DATA_DELAYED');
+    expect(rows[1].text()).toContain('AGENT_PERFORMANCE.UNDER_A_MINUTE');
   });
 
-  it('shows an explicit warning when the payroll tracking start is missing', async () => {
-    const wrapper = mountComponent();
-    wrapper.vm.report = report(null);
-    await wrapper.vm.$nextTick();
+  it('marks a number below its target in red', async () => {
+    const wrapper = await mountComponent();
+    const messagesCell = wrapper
+      .findAll('[data-testid="agents-table"] tbody tr')[0]
+      .findAll('td')[1];
 
-    expect(wrapper.find('[data-testid="tracking-start-warning"]').text()).toBe(
-      'AGENT_PERFORMANCE.TRACKING_START_MISSING'
+    expect(messagesCell.find('span').classes()).toContain('text-n-ruby-11');
+    expect(messagesCell.text()).toContain(
+      'AGENT_PERFORMANCE.OF_TARGET {"target":50}'
     );
   });
 
   it('renders only one loading state', async () => {
-    const wrapper = mountComponent();
+    const wrapper = await mountComponent();
     wrapper.vm.loading = true;
     await wrapper.vm.$nextTick();
 
     expect(wrapper.findAll('[data-testid="loading-state"]')).toHaveLength(1);
-  });
-
-  it('renders the report in RTL while preserving directional values', async () => {
-    const wrapper = mountComponent();
-    wrapper.vm.report = report('2026-08-11T10:00:00Z');
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.attributes('dir')).toBe('rtl');
-    expect(
-      wrapper.findAllComponents({ name: 'Input' })[0].attributes('dir')
-    ).toBe('ltr');
-    expect(wrapper.find('select').attributes('aria-label')).toBe(
-      'AGENT_PERFORMANCE.SELECT_AGENT'
-    );
   });
 });

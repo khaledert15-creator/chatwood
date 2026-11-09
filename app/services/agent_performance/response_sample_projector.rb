@@ -10,12 +10,8 @@ class AgentPerformance::ResponseSampleProjector
   def call
     return unless AgentPerformance::MessageClassifier.call(message).eligible
 
-    wait_started_at = customer_wait_started_at
-    interval = assignment_interval
-    exclusion = exclusion_attributes(wait_started_at, interval)
-
     AgentPerformance::ResponseSample.upsert( # rubocop:disable Rails/SkipsModelValidations
-      attributes(wait_started_at, interval, exclusion),
+      attributes(customer_wait_started_at),
       unique_by: :source_message_id
     )
   end
@@ -42,30 +38,18 @@ class AgentPerformance::ResponseSampleProjector
     scope.minimum(:created_at)
   end
 
-  def assignment_interval
-    AgentPerformance::AssignmentInterval.where(account_id: message.account_id, conversation_id: message.conversation_id)
-                                        .covering(message.created_at).first
-  end
-
-  def exclusion_attributes(wait_started_at, interval)
-    return { reason: 'invalid_waiting_episode', eligible: false, unassigned: false, missing: false } if wait_started_at.blank?
-    return { reason: nil, eligible: true, unassigned: false, missing: false } if interval&.user_id == message.sender_id
-    return { reason: 'unassigned_responder', eligible: false, unassigned: true, missing: false } if interval.present?
-
-    { reason: 'assignment_history_missing', eligible: false, unassigned: false, missing: true }
-  end
-
-  def attributes(wait_started_at, interval, exclusion) # rubocop:disable Metrics/AbcSize
-    responsibility_started_at = [wait_started_at, interval&.started_at].compact.max if exclusion[:eligible]
+  # A reply is credited to the agent who sent it, whoever the conversation is assigned to.
+  # Follow-up messages with no new customer message in between are not replies, so they are not timed.
+  def attributes(wait_started_at)
     {
       account_id: message.account_id, user_id: message.sender_id, conversation_id: message.conversation_id,
       inbox_id: message.inbox_id, source_message_id: message.id,
-      customer_wait_started_at: wait_started_at, responsibility_started_at: responsibility_started_at,
+      customer_wait_started_at: wait_started_at, responsibility_started_at: wait_started_at,
       responded_at: message.created_at,
-      customer_wait_seconds: duration(wait_started_at), accountable_wait_seconds: duration(responsibility_started_at),
-      first_response: previous_human_response.blank?, sla_eligible: exclusion[:eligible],
-      unassigned_responder: exclusion[:unassigned], assignment_history_missing: exclusion[:missing],
-      exclusion_reason: exclusion[:reason], created_at: Time.current, updated_at: Time.current
+      customer_wait_seconds: duration(wait_started_at), accountable_wait_seconds: duration(wait_started_at),
+      first_response: previous_human_response.blank?, sla_eligible: wait_started_at.present?,
+      unassigned_responder: false, assignment_history_missing: false,
+      exclusion_reason: wait_started_at.present? ? nil : 'invalid_waiting_episode', created_at: Time.current, updated_at: Time.current
     }
   end
 

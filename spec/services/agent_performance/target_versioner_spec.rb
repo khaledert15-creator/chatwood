@@ -20,4 +20,20 @@ RSpec.describe AgentPerformance::TargetVersioner do
     expect(old_target.reload.effective_until).to eq(Date.new(2026, 8, 10))
     expect(new_target.target_value).to eq(175)
   end
+
+  it 'replaces a target set again on the same day' do
+    old_target = create(:agent_performance_target, account: account, user: agent, created_by: admin,
+                                                   effective_from: Date.new(2026, 8, 11))
+
+    described_class.new(
+      account: account, actor: admin,
+      attributes: {
+        user_id: agent.id, period_type: 'daily', metric: 'customer_facing_messages',
+        target_value: 200, effective_from: '2026-08-11'
+      }
+    ).create!
+
+    expect(AgentPerformance::Target.exists?(old_target.id)).to be(false)
+    expect(AgentPerformance::Target.last.target_value).to eq(200)
+  end
 end

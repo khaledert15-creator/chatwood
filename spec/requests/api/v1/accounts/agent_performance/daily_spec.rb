@@ -8,32 +8,34 @@ RSpec.describe 'Agent performance daily API', type: :request do
 
   before { account.enable_features!(:agent_performance_analytics) }
 
-  it 'returns the daily report with freshness and eligibility details' do
+  it 'returns one row per agent with the four daily numbers and targets' do
     create(:agent_performance_daily_rollup, account: account, user: agent, date: Date.new(2026, 8, 11),
-                                            calculated_at: Time.current, sla_eligible_count: 0,
-                                            excluded_responses_count: 1,
-                                            excluded_assignment_history_missing_count: 1)
+                                            total_customer_facing_messages_count: 40, replied_conversations_count: 12,
+                                            sla_eligible_count: 10, response_time_median_seconds: 95.4,
+                                            bucket_10_to_30m: 2, bucket_30m_plus: 1)
+    create(:agent_performance_target, account: account, user: agent, created_by: admin,
+                                      metric: 'customer_facing_messages', target_value: 50, effective_from: Date.new(2026, 8, 1))
 
-    get "/api/v1/accounts/#{account.id}/agent_performance/daily",
-        params: { agent_id: agent.id, date: '2026-08-11' }, headers: headers, as: :json
+    get "/api/v1/accounts/#{account.id}/agent_performance/daily", params: { date: '2026-08-11' }, headers: headers, as: :json
 
     expect(response).to have_http_status(:success)
-    expect(response.parsed_body.dig('response_sla', 'compliance_percentage')).to be_nil
-    expect(response.parsed_body.dig('response_eligibility', 'excluded')).to eq(1)
+    expect(response.parsed_body['agents'].find { |row| row['id'] == agent.id }).to include(
+      'messages' => 40, 'conversations' => 12, 'replies' => 10, 'typical_reply_seconds' => 95, 'late_replies' => 3,
+      'targets' => { 'messages' => 50, 'conversations' => nil }
+    )
   end
 
   it 'is hidden when the feature is disabled' do
     account.disable_features!(:agent_performance_analytics)
 
-    get "/api/v1/accounts/#{account.id}/agent_performance/daily",
-        params: { agent_id: agent.id, date: '2026-08-11' }, headers: headers, as: :json
+    get "/api/v1/accounts/#{account.id}/agent_performance/daily", params: { date: '2026-08-11' }, headers: headers, as: :json
 
     expect(response).to have_http_status(:not_found)
   end
 
   it 'rejects agents from viewing payroll reports' do
     get "/api/v1/accounts/#{account.id}/agent_performance/daily",
-        params: { agent_id: agent.id, date: '2026-08-11' }, headers: agent.create_new_auth_token, as: :json
+        params: { date: '2026-08-11' }, headers: agent.create_new_auth_token, as: :json
 
     expect(response).to have_http_status(:unauthorized)
   end

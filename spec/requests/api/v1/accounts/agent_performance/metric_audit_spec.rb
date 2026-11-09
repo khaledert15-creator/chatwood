@@ -8,11 +8,8 @@ RSpec.describe 'Agent performance metric audit', type: :request do
   let(:date) { Date.new(2026, 8, 11) }
   let(:headers) { admin.create_new_auth_token }
 
-  it 'reconciles known source messages, facts, response samples, rollup, and API values' do # rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+  it 'reconciles known source messages, facts, response samples, rollup, and API values' do # rubocop:disable RSpec/ExampleLength
     account.enable_features!(:agent_performance_analytics)
-    create(:agent_performance_target, account: account, user: agent, created_by: admin,
-                                      metric: 'response_sla_compliance', target_value: 100,
-                                      threshold_seconds: 180, effective_from: date)
 
     repeated_conversation = create(:conversation, account: account)
     create(:message, account: account, conversation: repeated_conversation, inbox: repeated_conversation.inbox,
@@ -74,22 +71,15 @@ RSpec.describe 'Agent performance metric audit', type: :request do
     AgentPerformance::MessageCollector.new(account: account).perform
     AgentPerformance::DailyRollupBuilder.new(account: account, user_id: agent.id, date: date).perform
 
-    get "/api/v1/accounts/#{account.id}/agent_performance/daily",
-        params: { agent_id: agent.id, date: date.iso8601 }, headers: headers, as: :json
+    get "/api/v1/accounts/#{account.id}/agent_performance/daily", params: { date: date.iso8601 }, headers: headers, as: :json
 
     transfer_sample = AgentPerformance::ResponseSample.find_by!(source_message_id: transfer_reply.id)
-    expect(transfer_sample).to have_attributes(customer_wait_seconds: 360, accountable_wait_seconds: 60)
+    expect(transfer_sample).to have_attributes(customer_wait_seconds: 360, accountable_wait_seconds: 360)
     expect(AgentPerformance::MessageFact.where(account: account, user: agent).count).to eq(16)
     expect(AgentPerformance::ResponseSample.where(account: account, user: agent).count).to eq(16)
     expect(response).to have_http_status(:success)
-    expect(response.parsed_body).to include(
-      'messages' => { 'manual' => 15, 'manual_template' => 1, 'total_customer_facing' => 16 },
-      'replied_conversations' => 7
-    )
-    expect(response.parsed_body['response_eligibility']).to include('eligible' => 4, 'excluded' => 12)
-    expect(response.parsed_body['response_sla']).to include('met_count' => 4, 'compliance_percentage' => 100.0)
-    expect(response.parsed_body['response_times']).to include(
-      'average_seconds' => 105.0, 'median_seconds' => 90.0, 'p90_seconds' => 162.0
+    expect(response.parsed_body['agents'].find { |row| row['id'] == agent.id }).to include(
+      'messages' => 16, 'conversations' => 7, 'replies' => 6, 'typical_reply_seconds' => 90, 'late_replies' => 0
     )
   end
 end
