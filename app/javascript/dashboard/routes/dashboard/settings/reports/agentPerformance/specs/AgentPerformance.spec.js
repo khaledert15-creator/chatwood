@@ -18,6 +18,7 @@ vi.mock('vue-i18n', () => ({
 const report = {
   late_reply_minutes: 10,
   updated_at: '2026-08-11T10:10:00Z',
+  chats: { customer: 20, replied: 17 },
   agents: [
     {
       id: 1,
@@ -27,6 +28,7 @@ const report = {
       replies: 3,
       typical_reply_seconds: 30,
       late_replies: 0,
+      assigned_chats: { customer: 0, replied: 0 },
       targets: { messages: null, conversations: null },
     },
     {
@@ -37,6 +39,7 @@ const report = {
       replies: 8,
       typical_reply_seconds: 190,
       late_replies: 2,
+      assigned_chats: { customer: 10, replied: 8 },
       targets: { messages: 50, conversations: null },
     },
   ],
@@ -75,6 +78,21 @@ describe('AgentPerformance', () => {
     expect(messagesCell.find('span').classes()).toContain('text-n-ruby-11');
     expect(messagesCell.text()).toContain(
       'AGENT_PERFORMANCE.OF_TARGET {"target":50}'
+    );
+  });
+
+  it('shows how many customer chats got a reply and how many are waiting', async () => {
+    const wrapper = await mountComponent();
+    const summary = wrapper.find('[data-testid="chats-summary"]');
+
+    expect(summary.text()).toContain(
+      'AGENT_PERFORMANCE.CHATS_SUMMARY {"customer":20,"replied":17}'
+    );
+    expect(summary.find('span').classes()).toContain('text-n-ruby-11');
+    expect(
+      wrapper.findAll('[data-testid="agents-table"] tbody tr')[0].text()
+    ).toContain(
+      'AGENT_PERFORMANCE.REPLIED_OF_CHATS {"replied":8,"customer":10}'
     );
   });
 

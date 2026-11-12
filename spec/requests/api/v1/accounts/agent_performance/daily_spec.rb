@@ -25,6 +25,27 @@ RSpec.describe 'Agent performance daily API', type: :request do
     )
   end
 
+  it 'counts customer chats of the day and which of them got an agent reply after the last customer message' do
+    replied = create(:conversation, account: account, assignee: agent)
+    create(:message, account: account, conversation: replied, inbox: replied.inbox, message_type: :incoming,
+                     created_at: Time.zone.parse('2026-08-11 09:00:00'))
+    create(:message, account: account, conversation: replied, inbox: replied.inbox, message_type: :outgoing,
+                     sender: agent, created_at: Time.zone.parse('2026-08-11 09:05:00'))
+    waiting = create(:conversation, account: account, assignee: agent)
+    create(:message, account: account, conversation: waiting, inbox: waiting.inbox, message_type: :outgoing,
+                     sender: agent, created_at: Time.zone.parse('2026-08-11 10:00:00'))
+    create(:message, account: account, conversation: waiting, inbox: waiting.inbox, message_type: :incoming,
+                     created_at: Time.zone.parse('2026-08-11 10:05:00'))
+    unassigned = create(:conversation, account: account, assignee: nil)
+    create(:message, account: account, conversation: unassigned, inbox: unassigned.inbox, message_type: :incoming,
+                     created_at: Time.zone.parse('2026-08-11 11:00:00'))
+
+    get "/api/v1/accounts/#{account.id}/agent_performance/daily", params: { date: '2026-08-11' }, headers: headers, as: :json
+
+    expect(response.parsed_body['chats']).to eq('customer' => 3, 'replied' => 1)
+    expect(response.parsed_body['agents'].find { |row| row['id'] == agent.id }['assigned_chats']).to eq('customer' => 2, 'replied' => 1)
+  end
+
   it 'is hidden when the feature is disabled' do
     account.disable_features!(:agent_performance_analytics)
 

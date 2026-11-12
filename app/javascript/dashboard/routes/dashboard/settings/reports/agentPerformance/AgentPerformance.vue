@@ -24,6 +24,10 @@ const agents = computed(() =>
   [...(report.value?.agents || [])].sort((a, b) => b.messages - a.messages)
 );
 
+const unrepliedChats = computed(
+  () => report.value.chats.customer - report.value.chats.replied
+);
+
 const updatedAt = computed(() => {
   const timestamp = report.value?.updated_at;
   return timestamp
@@ -116,6 +120,26 @@ onMounted(loadReport);
       <Spinner class="mx-auto" />
     </div>
     <template v-else-if="report">
+      <p
+        class="p-4 mb-4 rounded-xl bg-n-alpha-1 text-body-main text-n-slate-12"
+        data-testid="chats-summary"
+      >
+        {{
+          $t('AGENT_PERFORMANCE.CHATS_SUMMARY', {
+            customer: report.chats.customer,
+            replied: report.chats.replied,
+          })
+        }}
+        <span
+          class="font-medium"
+          :class="unrepliedChats > 0 ? 'text-n-ruby-11' : 'text-n-teal-11'"
+        >
+          {{
+            $t('AGENT_PERFORMANCE.CHATS_UNREPLIED', { count: unrepliedChats })
+          }}
+        </span>
+      </p>
+
       <section
         class="mb-4 overflow-x-auto rounded-xl outline outline-1 outline-n-container"
       >
@@ -130,6 +154,9 @@ onMounted(loadReport);
               </th>
               <th class="p-3 font-medium text-start">
                 {{ $t('AGENT_PERFORMANCE.COLUMNS.CONVERSATIONS') }}
+              </th>
+              <th class="p-3 font-medium text-start">
+                {{ $t('AGENT_PERFORMANCE.COLUMNS.ASSIGNED_CHATS') }}
               </th>
               <th class="p-3 font-medium text-start">
                 {{ $t('AGENT_PERFORMANCE.COLUMNS.TYPICAL_REPLY') }}
@@ -193,6 +220,23 @@ onMounted(loadReport);
                   }}
                 </span>
               </td>
+              <td
+                class="p-3 font-medium"
+                :class="
+                  agent.assigned_chats.replied < agent.assigned_chats.customer
+                    ? 'text-n-ruby-11'
+                    : 'text-n-slate-12'
+                "
+              >
+                {{
+                  agent.assigned_chats.customer
+                    ? $t('AGENT_PERFORMANCE.REPLIED_OF_CHATS', {
+                        replied: agent.assigned_chats.replied,
+                        customer: agent.assigned_chats.customer,
+                      })
+                    : '—'
+                }}
+              </td>
               <td class="p-3 text-n-slate-12">
                 {{ formatReplyTime(agent.typical_reply_seconds) }}
               </td>
@@ -221,6 +265,7 @@ onMounted(loadReport);
       >
         <li>{{ $t('AGENT_PERFORMANCE.EXPLANATIONS.MESSAGES') }}</li>
         <li>{{ $t('AGENT_PERFORMANCE.EXPLANATIONS.CONVERSATIONS') }}</li>
+        <li>{{ $t('AGENT_PERFORMANCE.EXPLANATIONS.ASSIGNED_CHATS') }}</li>
         <li>{{ $t('AGENT_PERFORMANCE.EXPLANATIONS.TYPICAL_REPLY') }}</li>
         <li>
           {{

@@ -669,7 +669,8 @@
       "MESSAGES": "Messages sent",
       "CONVERSATIONS": "Customers replied to",
       "TYPICAL_REPLY": "Usually replies within",
-      "LATE_REPLIES": "Late replies (over {minutes} min)"
+      "LATE_REPLIES": "Late replies (over {minutes} min)",
+      "ASSIGNED_CHATS": "Assigned chats answered"
     },
     "OF_TARGET": "of {target}",
     "LATE_OF_REPLIES": "{late} of {replies}",
@@ -680,7 +681,8 @@
       "MESSAGES": "Messages sent: every message the agent sent to customers that day.",
       "CONVERSATIONS": "Customers replied to: how many different conversations the agent replied in.",
       "TYPICAL_REPLY": "Usually replies within: half of the agent's replies were this fast or faster, so one slow night reply does not distort it.",
-      "LATE_REPLIES": "Late replies: how many times a customer waited more than {minutes} minutes for this agent's reply, out of all their replies."
+      "LATE_REPLIES": "Late replies: how many times a customer waited more than {minutes} minutes for this agent's reply, out of all their replies.",
+      "ASSIGNED_CHATS": "Assigned chats answered: of the chats assigned to the agent where a customer wrote that day, how many got a reply after the customer's last message (from them or a colleague)."
     },
     "CONFIGURE_TARGETS": "Daily targets",
     "TARGETS_HINT": "A number turns green when the agent reaches the target and red when they are below it. Leave a box empty to keep its current target.",
@@ -688,7 +690,10 @@
     "CONVERSATIONS_TARGET": "Customers replied to per day",
     "SAVE_TARGETS": "Save targets",
     "TARGETS_SAVED": "Targets saved.",
-    "TARGETS_ERROR": "Could not save the targets."
+    "TARGETS_ERROR": "Could not save the targets.",
+    "CHATS_SUMMARY": "Customers wrote in {customer} chats on this day, and {replied} of them got a reply.",
+    "CHATS_UNREPLIED": "{count} still have no reply.",
+    "REPLIED_OF_CHATS": "{replied} of {customer}"
   },
   "SUMMARY_REPORTS": {
     "INBOX": "Inbox",
