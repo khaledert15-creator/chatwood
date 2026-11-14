@@ -4,7 +4,13 @@ import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import { useVuelidate } from '@vuelidate/core';
-import { required, email } from '@vuelidate/validators';
+import {
+  required,
+  requiredIf,
+  email,
+  minLength,
+  helpers,
+} from '@vuelidate/validators';
 import Button from 'dashboard/components-next/button/Button.vue';
 
 const emit = defineEmits(['close']);
@@ -14,17 +20,32 @@ const { t } = useI18n();
 
 const agentName = ref('');
 const agentEmail = ref('');
+const agentPhoneNumber = ref('');
+const agentPassword = ref('');
+
+// agents can be added with a mobile number only; they then log in with a password set here
+const isPhoneOnly = computed(() => !agentEmail.value);
 const selectedRoleId = ref('agent');
 
 const rules = {
   agentName: { required },
-  agentEmail: { required, email },
+  agentEmail: { required: requiredIf(() => !agentPhoneNumber.value), email },
+  agentPhoneNumber: {
+    required: requiredIf(() => !agentEmail.value),
+    phoneNumber: helpers.regex(/^\+?[\d\s-]{6,20}$/),
+  },
+  agentPassword: {
+    required: requiredIf(isPhoneOnly),
+    minLength: minLength(6),
+  },
   selectedRoleId: { required },
 };
 
 const v$ = useVuelidate(rules, {
   agentName,
   agentEmail,
+  agentPhoneNumber,
+  agentPassword,
   selectedRoleId,
 });
 
@@ -69,7 +90,9 @@ const addAgent = async () => {
     const payload = {
       name: agentName.value,
       email: agentEmail.value,
+      phone_number: agentPhoneNumber.value,
     };
+    if (isPhoneOnly.value) payload.password = agentPassword.value;
 
     if (selectedRole.value.name.startsWith('custom_')) {
       payload.custom_role_id = selectedRole.value.id;
@@ -144,6 +167,38 @@ const addAgent = async () => {
             :placeholder="$t('AGENT_MGMT.ADD.FORM.EMAIL.PLACEHOLDER')"
             @input="v$.agentEmail.$touch"
           />
+        </label>
+      </div>
+
+      <div class="w-full">
+        <label :class="{ error: v$.agentPhoneNumber.$error }">
+          {{ $t('AGENT_MGMT.ADD.FORM.PHONE_NUMBER.LABEL') }}
+          <input
+            v-model="agentPhoneNumber"
+            type="tel"
+            dir="ltr"
+            :placeholder="$t('AGENT_MGMT.ADD.FORM.PHONE_NUMBER.PLACEHOLDER')"
+            @input="v$.agentPhoneNumber.$touch"
+          />
+          <span v-if="v$.agentPhoneNumber.$error" class="message">
+            {{ $t('AGENT_MGMT.ADD.FORM.PHONE_NUMBER.ERROR') }}
+          </span>
+        </label>
+      </div>
+
+      <div v-if="isPhoneOnly" class="w-full">
+        <label :class="{ error: v$.agentPassword.$error }">
+          {{ $t('AGENT_MGMT.ADD.FORM.PASSWORD.LABEL') }}
+          <input
+            v-model="agentPassword"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="$t('AGENT_MGMT.ADD.FORM.PASSWORD.PLACEHOLDER')"
+            @input="v$.agentPassword.$touch"
+          />
+          <span class="message !text-n-slate-11">
+            {{ $t('AGENT_MGMT.ADD.FORM.PASSWORD.HELP') }}
+          </span>
         </label>
       </div>
 

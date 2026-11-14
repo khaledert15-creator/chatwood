@@ -143,6 +143,12 @@
     "SHOW_QUOTED_TEXT": "إظهار النص المقتبس",
     "MESSAGE_READ": "قراءة",
     "SENDING": "Sending",
-    "UNREAD_COUNT_OVERFLOW": "9+"
+    "UNREAD_COUNT_OVERFLOW": "9+",
+    "WAITING_BADGE": {
+      "MINUTES": "ينتظر {minutes} د",
+      "HOURS": "ينتظر {hours} س",
+      "DAYS": "ينتظر {days} ي",
+      "TOOLTIP": "العميل ينتظر الرد"
+    }
   }
 }

@@ -2,7 +2,12 @@
 import { useAlert } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import { useVuelidate } from '@vuelidate/core';
-import { required, minLength, email } from '@vuelidate/validators';
+import {
+  required,
+  requiredIf,
+  minLength,
+  email,
+} from '@vuelidate/validators';
 export default {
   components: {
     NextButton,
@@ -49,7 +54,8 @@ export default {
     },
     userDisplayName: {},
     userEmail: {
-      required,
+      // agents registered with a mobile number only may have no email
+      required: requiredIf((_, vm) => !!vm.email),
       email,
     },
   },

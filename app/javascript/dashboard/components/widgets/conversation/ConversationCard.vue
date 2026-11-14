@@ -9,6 +9,7 @@ import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
 import CardLabels from './conversationCardComponents/CardLabels.vue';
 import CardPriorityIcon from 'dashboard/components-next/Conversation/ConversationCard/CardPriorityIcon.vue';
 import UnreadBadge from 'dashboard/components-next/Conversation/ConversationCard/UnreadBadge.vue';
+import WaitingTimeBadge from 'dashboard/components-next/Conversation/ConversationCard/WaitingTimeBadge.vue';
 import SLACardLabel from './components/SLACardLabel.vue';
 import VoiceCallStatus from './VoiceCallStatus.vue';
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
@@ -66,8 +67,16 @@ const hasSlaPolicyId = computed(
   () => props.chat?.applied_sla?.id && !props.currentContact?.blocked
 );
 
+const isWaitingForReply = computed(
+  () => !!props.chat.waiting_since && props.chat.status !== 'resolved'
+);
+
 const showLabelsSection = computed(() => {
-  return props.chat.labels?.length > 0 || hasSlaPolicyId.value;
+  return (
+    props.chat.labels?.length > 0 ||
+    hasSlaPolicyId.value ||
+    isWaitingForReply.value
+  );
 });
 
 const messagePreviewClass = computed(() => {
@@ -237,8 +246,17 @@ watch(
         :conversation-labels="chat.labels"
         class="mt-0.5 mx-2 mb-0"
       >
-        <template v-if="hasSlaPolicyId" #before>
-          <SLACardLabel :chat="chat" class="ltr:mr-1 rtl:ml-1" />
+        <template v-if="hasSlaPolicyId || isWaitingForReply" #before>
+          <WaitingTimeBadge
+            v-if="isWaitingForReply"
+            :waiting-since="chat.waiting_since"
+            class="ltr:mr-1 rtl:ml-1"
+          />
+          <SLACardLabel
+            v-if="hasSlaPolicyId"
+            :chat="chat"
+            class="ltr:mr-1 rtl:ml-1"
+          />
         </template>
       </CardLabels>
     </div>

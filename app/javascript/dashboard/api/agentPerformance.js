@@ -6,10 +6,8 @@ class AgentPerformanceAPI extends ApiClient {
     super('agent_performance', { accountScoped: true });
   }
 
-  getDaily({ agentId, date }) {
-    return axios.get(`${this.url}/daily`, {
-      params: { agent_id: agentId, date },
-    });
+  getDaily({ date }) {
+    return axios.get(`${this.url}/daily`, { params: { date } });
   }
 
   getTargets() {

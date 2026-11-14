@@ -43,7 +43,7 @@ const agentList = computed(() => getters['agents/getAgents'].value);
 const filteredAgentList = computed(() => {
   const query = searchQuery.value.trim();
   if (!query) return agentList.value;
-  return picoSearch(agentList.value, query, ['name', 'email']);
+  return picoSearch(agentList.value, query, ['name', 'email', 'phone_number']);
 });
 
 const uiFlags = computed(() => getters['agents/getUIFlags'].value);
@@ -184,7 +184,7 @@ const confirmDeletion = () => {
       <div v-else class="divide-y divide-n-weak border-t border-n-weak">
         <div
           v-for="(agent, index) in filteredAgentList"
-          :key="agent.email"
+          :key="agent.id"
           class="flex justify-between flex-row items-start gap-4 py-4"
         >
           <div class="flex items-center gap-4">
@@ -200,9 +200,15 @@ const confirmDeletion = () => {
                 {{ agent.name }}
               </span>
               <div class="flex items-center gap-2">
-                <span class="text-body-main text-n-slate-11">
+                <span v-if="agent.email" class="text-body-main text-n-slate-11">
                   {{ agent.email }}
                 </span>
+                <template v-if="agent.phone_number">
+                  <div v-if="agent.email" class="w-px h-3 bg-n-strong rounded-lg" />
+                  <span class="text-body-main text-n-slate-11" dir="ltr">
+                    {{ agent.phone_number }}
+                  </span>
+                </template>
                 <div class="w-px h-3 bg-n-strong rounded-lg" />
                 <span
                   class="block w-fit text-body-main text-n-slate-11 relative"
@@ -289,6 +295,7 @@ const confirmDeletion = () => {
         :provider="currentAgent.provider"
         :type="currentAgent.role"
         :email="currentAgent.email"
+        :phone-number="currentAgent.phone_number"
         :availability="currentAgent.availability_status"
         :custom-role-id="currentAgent.custom_role_id"
         @close="hideEditPopup"

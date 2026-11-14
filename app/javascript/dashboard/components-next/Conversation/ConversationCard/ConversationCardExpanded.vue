@@ -10,6 +10,7 @@ import Avatar from 'next/avatar/Avatar.vue';
 import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
 import SLACardLabel from 'dashboard/components-next/Conversation/Sla/SLACardLabel.vue';
 import CardStatusIcon from './CardStatusIcon.vue';
+import WaitingTimeBadge from './WaitingTimeBadge.vue';
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 
@@ -47,6 +48,10 @@ const voiceCallData = computed(() => {
 });
 
 const unreadCount = computed(() => props.chat.unread_count);
+
+const isWaitingForReply = computed(
+  () => !!props.chat.waiting_since && props.chat.status !== 'resolved'
+);
 
 const slaCardLabel = useTemplateRef('slaCardLabel');
 
@@ -176,6 +181,11 @@ const selectedModel = computed({
           class="my-0 [&>div]:justify-end justify-end"
         />
       </div>
+
+      <WaitingTimeBadge
+        v-if="isWaitingForReply"
+        :waiting-since="chat.waiting_since"
+      />
 
       <div v-if="hasSlaPolicyId" class="flex-shrink-0">
         <SLACardLabel ref="slaCardLabel" :chat="chat" />

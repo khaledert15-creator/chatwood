@@ -1,113 +1,77 @@
 class AgentPerformance::DailyReportBuilder
   TIMEZONE = 'Africa/Cairo'.freeze
+  LATE_REPLY_MINUTES = 10
 
-  def initialize(account:, user:, date:)
+  def initialize(account:, date:)
     @account = account
-    @user = user
     @date = date.to_date
   end
 
   def build
     {
-      agent: { id: user.id, name: user.name, email: user.email },
-      date: date, timezone: TIMEZONE,
-      analytics_tracking_started_at: account.agent_performance_tracking_started_at,
-      freshness: freshness,
-      messages: messages,
-      replied_conversations: rollup&.replied_conversations_count.to_i,
-      response_times: response_times,
-      response_sla: response_sla,
-      response_distribution: response_distribution,
-      response_eligibility: response_eligibility,
-      targets: targets,
-      hourly: hourly
+      date: date,
+      late_reply_minutes: LATE_REPLY_MINUTES,
+      updated_at: rollups.values.map(&:calculated_at).min,
+      chats: { customer: chat_counts.values.sum { |row| row[:customer] }, replied: chat_counts.values.sum { |row| row[:replied] } },
+      agents: account.users.order(:name).map { |user| agent_row(user, rollups[user.id]) }
     }
   end
 
   private
 
-  attr_reader :account, :user, :date
+  attr_reader :account, :date
 
-  def rollup
-    @rollup ||= AgentPerformance::DailyRollup.find_by(account_id: account.id, user_id: user.id, date: date)
+  def rollups
+    @rollups ||= AgentPerformance::DailyRollup.where(account_id: account.id, date: date).index_by(&:user_id)
   end
 
-  def messages
-    {
-      manual: rollup&.manual_messages_count.to_i,
-      manual_template: rollup&.manual_template_messages_count.to_i,
-      total_customer_facing: rollup&.total_customer_facing_messages_count.to_i
-    }
-  end
-
-  def response_times
-    {
-      average_seconds: rollup&.response_time_average_seconds,
-      median_seconds: rollup&.response_time_median_seconds,
-      p90_seconds: rollup&.response_time_p90_seconds,
-      fastest_seconds: rollup&.response_time_fastest_seconds,
-      slowest_seconds: rollup&.response_time_slowest_seconds,
-      first_response_average_seconds: rollup&.first_response_time_average_seconds
-    }
-  end
-
-  def response_sla
-    eligible = rollup&.sla_eligible_count.to_i
-    {
-      threshold_seconds: rollup&.sla_threshold_seconds,
-      eligible_count: eligible,
-      met_count: rollup&.sla_met_count.to_i,
-      compliance_percentage: eligible.zero? || rollup&.sla_threshold_seconds.blank? ? nil : (rollup.sla_met_count.to_f / eligible * 100).round(2)
-    }
-  end
-
-  def response_distribution
-    %i[bucket_under_1m bucket_1_to_3m bucket_3_to_5m bucket_5_to_10m bucket_10_to_30m bucket_30m_plus]
-      .index_with { |key| rollup&.public_send(key).to_i }
-  end
-
-  def response_eligibility
-    {
-      eligible: rollup&.sla_eligible_count.to_i,
-      excluded: rollup&.excluded_responses_count.to_i,
-      exclusion_reasons: {
-        assignment_history_missing: rollup&.excluded_assignment_history_missing_count.to_i,
-        unassigned_responder: rollup&.excluded_unassigned_responder_count.to_i,
-        invalid_waiting_episode: rollup&.excluded_invalid_waiting_episode_count.to_i
-      }
-    }
-  end
-
-  def targets
-    {
-      messages: evaluate_target('customer_facing_messages', messages[:total_customer_facing]),
-      replied_conversations: evaluate_target('replied_conversations', rollup&.replied_conversations_count.to_i),
-      response_sla: evaluate_target('response_sla_compliance', response_sla[:compliance_percentage], unit: :percentage)
-    }
-  end
-
-  def evaluate_target(metric, actual, unit: :count)
-    target = AgentPerformance::TargetResolver.new(
-      account: account, user_id: user.id, period_type: 'daily', metric: metric, date: date
-    ).resolve
-    AgentPerformance::TargetEvaluator.new(target: target, actual: actual, unit: unit).as_json
-  end
-
-  def hourly
-    AgentPerformance::HourlyRollup.where(account_id: account.id, user_id: user.id, hour: cairo_range).order(:hour).map do |row|
-      { hour: row.hour, messages: row.total_customer_facing_messages_count, replied_conversations: row.replied_conversations_count }
-    end
-  end
-
-  def cairo_range
+  def range
     start = ActiveSupport::TimeZone[TIMEZONE].local(date.year, date.month, date.day)
     start...start.next_day
   end
 
-  def freshness
-    cursor = AgentPerformance::AnalyticsCursor.find_by(account_id: account.id, collector: AgentPerformance::MessageCollector::COLLECTOR_NAME)
-    data_fresh_as_of = [cursor&.last_successful_run_at, rollup&.calculated_at].compact.min
-    lag = (Time.current - data_fresh_as_of).to_i if data_fresh_as_of
-    { data_fresh_as_of: data_fresh_as_of, analytics_lag_seconds: lag, delayed: lag.nil? || lag > 300 }
+  # Conversations where a customer wrote on this day, grouped by current assignee. A conversation counts as replied
+  # once an agent answered after the customer's last message of the day, even if the answer came the next day.
+  def chat_counts
+    @chat_counts ||= Conversation.joins("JOIN (#{last_customer_messages.to_sql}) last_customer ON last_customer.conversation_id = conversations.id")
+                                 .group(:assignee_id)
+                                 .pluck(:assignee_id, Arel.sql('COUNT(*)'), Arel.sql("COUNT(*) FILTER (WHERE EXISTS (#{agent_replies.to_sql}))"))
+                                 .to_h { |assignee_id, customer, replied| [assignee_id, { customer: customer, replied: replied }] }
+  end
+
+  def last_customer_messages
+    account.messages.unscope(:order).incoming.where(private: false, created_at: range)
+           .group(:conversation_id).select('conversation_id, MAX(created_at) AS last_customer_at')
+  end
+
+  # Same rule as MessageClassifier: a non-private message an agent wrote, not sent by an automation or a campaign.
+  def agent_replies
+    Message.unscope(:order).outgoing.where(private: false, sender_type: 'User').select(1)
+           .where('messages.conversation_id = last_customer.conversation_id AND messages.created_at > last_customer.last_customer_at')
+           .where("COALESCE(messages.content_attributes->>'automation_rule_id', '') = ''")
+           .where("COALESCE(messages.additional_attributes->>'campaign_id', '') = ''")
+  end
+
+  # bucket_10_to_30m starts at 601 seconds, so the two buckets together are replies slower than 10 minutes.
+  def agent_row(user, rollup)
+    {
+      id: user.id, name: user.name, thumbnail: user.avatar_url,
+      messages: rollup&.total_customer_facing_messages_count.to_i,
+      conversations: rollup&.replied_conversations_count.to_i,
+      replies: rollup&.sla_eligible_count.to_i,
+      typical_reply_seconds: rollup&.response_time_median_seconds&.round,
+      late_replies: rollup&.bucket_10_to_30m.to_i + rollup&.bucket_30m_plus.to_i,
+      assigned_chats: chat_counts.fetch(user.id, { customer: 0, replied: 0 }),
+      targets: {
+        messages: target_value(user, 'customer_facing_messages'),
+        conversations: target_value(user, 'replied_conversations')
+      }
+    }
+  end
+
+  def target_value(user, metric)
+    AgentPerformance::TargetResolver.new(
+      account: account, user_id: user.id, period_type: 'daily', metric: metric, date: date
+    ).resolve&.target_value&.to_i
   end
 end
