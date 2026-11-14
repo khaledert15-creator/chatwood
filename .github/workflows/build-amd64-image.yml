@@ -1,61 +1,34 @@
 name: Build AMD64 production image
 
+# Builds the production image on GitHub so the VPS only pulls it instead of compiling for 5-45 minutes.
+# Every push to main produces ghcr.io/khaledert15-creator/chatwood:<short sha>.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      source_ref:
-        description: Git commit SHA to build
-        required: true
-        default: b47d1c0f94dbf22b9fe72d253e91f81a94dcfa70
-        type: string
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: manual-amd64-image-build
+  group: amd64-image-${{ github.sha }}
   cancel-in-progress: false
 
 env:
-  APPROVED_SOURCE_SHA: b47d1c0f94dbf22b9fe72d253e91f81a94dcfa70
   IMAGE_NAME: ghcr.io/khaledert15-creator/chatwood
-  IMAGE_TAG: 4.15.1-chat-comfort-b47d1c0f
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout requested source
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_ref }}
 
-      - name: Verify source commit
-        shell: bash
-        env:
-          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
-        run: |
-          ACTUAL_SHA=$(git rev-parse HEAD)
-          echo "Requested SHA: ${REQUESTED_SOURCE_REF}"
-          echo "Actual SHA: ${ACTUAL_SHA}"
-          if [ "${REQUESTED_SOURCE_REF}" != "${APPROVED_SOURCE_SHA}" ]; then
-            echo "::error::Requested source_ref is not approved for this image tag."
-            exit 1
-          fi
-          if [ "${ACTUAL_SHA}" != "${APPROVED_SOURCE_SHA}" ]; then
-            echo "::error::Checked-out HEAD does not match the approved source commit."
-            exit 1
-          fi
-
-      - name: Show build environment
-        run: |
-          uname -m
-          nproc
-          free -h
-          df -h
-          docker version
+      - name: Compute image tag
+        id: tag
+        run: echo "tag=4.15.1-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -75,16 +48,18 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Publish build summary
         run: |
           {
             echo "## AMD64 image build"
             echo
-            echo "- Source commit: \`${{ inputs.source_ref }}\`"
-            echo "- Image name: \`${IMAGE_NAME}\`"
-            echo "- Image tag: \`${IMAGE_TAG}\`"
-            echo "- Image digest: \`${{ steps.build.outputs.digest }}\`"
-            echo "- Platform: \`linux/amd64\`"
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo "- Image: \`${IMAGE_NAME}:${{ steps.tag.outputs.tag }}\`"
+            echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo
+            echo "Deploy on the server: \`/opt/chatwood/deploy.sh ${{ steps.tag.outputs.tag }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
